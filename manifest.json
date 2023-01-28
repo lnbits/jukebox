@@ -1,0 +1,14 @@
+{
+    "extensions": [
+         {
+            "id": "jukebox",
+            "repo": "https://github.com/lnbits/jukebox-extension,
+            "name": "Spotify Jukebox",
+            "version": "0.2",
+            "short_description": "Spotify jukebox middleware",
+            "icon": "https://raw.githubusercontent.com/lnbits/jukebox-extension/main/static/image/jukebox.png",
+            "archive": "https://github.com/lnbits/lnbits-extensions/raw/main/extensions/jukebox/jukebox-extension.zip",
+            "hash": "cca2eca8d43268e9a548249cf952b6973129c745df904cf511f67782b09eb110"
+        }
+    ]
+}
