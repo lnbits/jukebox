@@ -2,7 +2,7 @@
     "extensions": [
          {
             "id": "jukebox",
-            "repo": "https://github.com/lnbits/jukebox-extension,
+            "repo": "https://github.com/lnbits/jukebox-extension",
             "name": "Spotify Jukebox",
             "version": "0.2",
             "short_description": "Spotify jukebox middleware",
