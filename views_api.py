@@ -201,9 +201,9 @@ async def api_get_jukebox_device_check(
             timeout=40,
             headers={"Authorization": "Bearer " + jukebox.sp_access_token},
         )
-        if rDevice.status_code == 204 or rDevice.status_code == 200:
+        if rDevice.status_code in (204, 200):
             return json.loads(rDevice.text)
-        elif rDevice.status_code == 401 or rDevice.status_code == 403:
+        elif rDevice.status_code in (401, 403):
             token = await api_get_token(juke_id)
             if token is False:
                 raise HTTPException(
@@ -322,7 +322,7 @@ async def api_get_jukebox_invoice_paid(
                     )
                     if r.status_code == 204:
                         return jukebox_payment
-                    elif r.status_code == 401 or r.status_code == 403:
+                    elif r.status_code in (401, 403):
                         token = await api_get_token(juke_id)
                         if token is False:
                             raise HTTPException(
@@ -357,7 +357,7 @@ async def api_get_jukebox_invoice_paid(
                     if r.status_code == 204:
                         return jukebox_payment
 
-                    elif r.status_code == 401 or r.status_code == 403:
+                    elif r.status_code in (401, 403):
                         token = await api_get_token(juke_id)
                         if token is False:
                             raise HTTPException(
@@ -377,7 +377,7 @@ async def api_get_jukebox_invoice_paid(
                         raise HTTPException(
                             status_code=HTTPStatus.OK, detail="Invoice not paid"
                         )
-            elif r.status_code == 401 or r.status_code == 403:
+            elif r.status_code in (401, 403):
                 token = await api_get_token(juke_id)
                 if token is False:
                     raise HTTPException(
