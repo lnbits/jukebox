@@ -1,6 +1,7 @@
 import base64
 import json
 from http import HTTPStatus
+from typing import Optional
 
 import httpx
 from fastapi import Depends, Query
@@ -44,7 +45,7 @@ async def api_get_jukeboxs(
 
 @jukebox_ext.get("/api/v1/jukebox/spotify/cb/{juke_id}", response_class=HTMLResponse)
 async def api_check_credentials_callbac(
-    juke_id: str = Query(None),
+    juke_id: str,
     code: str = Query(None),
     access_token: str = Query(None),
     refresh_token: str = Query(None),
@@ -63,7 +64,7 @@ async def api_check_credentials_callbac(
 
 
 @jukebox_ext.get("/api/v1/jukebox/{juke_id}", dependencies=[Depends(require_admin_key)])
-async def api_check_credentials_check(juke_id: str = Query(None)):
+async def api_check_credentials_check(juke_id: str):
     jukebox = await get_jukebox(juke_id)
     return jukebox
 
@@ -75,7 +76,7 @@ async def api_check_credentials_check(juke_id: str = Query(None)):
 )
 @jukebox_ext.put("/api/v1/jukebox/{juke_id}", status_code=HTTPStatus.OK)
 async def api_create_update_jukebox(
-    data: CreateJukeLinkData, juke_id: str = Query(None)
+    data: CreateJukeLinkData, juke_id: Optional[str]
 ):
     if juke_id:
         jukebox = await update_jukebox(data, juke_id=juke_id)
@@ -87,9 +88,7 @@ async def api_create_update_jukebox(
 @jukebox_ext.delete(
     "/api/v1/jukebox/{juke_id}", dependencies=[Depends(require_admin_key)]
 )
-async def api_delete_item(
-    juke_id: str = Query(None),
-):
+async def api_delete_item(juke_id: str):
     await delete_jukebox(juke_id)
     # try:
     #     return [{**jukebox} for jukebox in await get_jukeboxs(wallet.wallet.user)]
@@ -104,8 +103,8 @@ async def api_delete_item(
 
 @jukebox_ext.get("/api/v1/jukebox/jb/playlist/{juke_id}/{sp_playlist}")
 async def api_get_jukebox_song(
-    juke_id: str = Query(None),
-    sp_playlist: str = Query(None),
+    juke_id: str,
+    sp_playlist: str,
     retry: bool = Query(False),
 ):
     jukebox = await get_jukebox(juke_id)
@@ -189,7 +188,7 @@ async def api_get_token(juke_id):
 
 @jukebox_ext.get("/api/v1/jukebox/jb/{juke_id}")
 async def api_get_jukebox_device_check(
-    juke_id: str = Query(None), retry: bool = Query(False)
+    juke_id: str, retry: bool = Query(False)
 ):
     jukebox = await get_jukebox(juke_id)
     if not jukebox:
@@ -263,7 +262,7 @@ async def api_get_jukebox_invoice(juke_id, song_id):
 
 @jukebox_ext.get("/api/v1/jukebox/jb/checkinvoice/{pay_hash}/{juke_id}")
 async def api_get_jukebox_invoice_check(
-    pay_hash: str = Query(None), juke_id: str = Query(None)
+    pay_hash: str, juke_id: str
 ):
     try:
         await get_jukebox(juke_id)
@@ -282,9 +281,9 @@ async def api_get_jukebox_invoice_check(
 
 @jukebox_ext.get("/api/v1/jukebox/jb/invoicep/{song_id}/{juke_id}/{pay_hash}")
 async def api_get_jukebox_invoice_paid(
-    song_id: str = Query(None),
-    juke_id: str = Query(None),
-    pay_hash: str = Query(None),
+    song_id: str,
+    juke_id: str,
+    pay_hash: str,
     retry: bool = Query(False),
 ):
     jukebox = await get_jukebox(juke_id)
@@ -399,7 +398,8 @@ async def api_get_jukebox_invoice_paid(
 
 @jukebox_ext.get("/api/v1/jukebox/jb/currently/{juke_id}")
 async def api_get_jukebox_currently(
-    retry: bool = Query(False), juke_id: str = Query(None)
+    juke_id: str,
+    retry: bool = Query(False)
 ):
     jukebox = await get_jukebox(juke_id)
     if not jukebox:
