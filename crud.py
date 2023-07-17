@@ -35,14 +35,15 @@ async def create_jukebox(data: CreateJukeLinkData) -> Jukebox:
 
 async def update_jukebox(
     data: Union[CreateJukeLinkData, Jukebox], juke_id: str = ""
-) -> Optional[Jukebox]:
+) -> Jukebox:
     q = ", ".join([f"{field[0]} = ?" for field in data])
     items = [f"{field[1]}" for field in data]
     items.append(juke_id)
     q = q.replace("user", '"user"', 1)  # hack to make user be "user"!
     await db.execute(f"UPDATE jukebox.jukebox SET {q} WHERE id = ?", (items,))
     row = await db.fetchone("SELECT * FROM jukebox.jukebox WHERE id = ?", (juke_id,))
-    return Jukebox(**row) if row else None
+    assert row, "Jukebox couldn't be retrieved after update"
+    return Jukebox(**row)
 
 
 async def get_jukebox(juke_id: str) -> Optional[Jukebox]:
