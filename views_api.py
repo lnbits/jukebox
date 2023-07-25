@@ -23,7 +23,7 @@ from .crud import (
     update_jukebox,
     update_jukebox_payment,
 )
-from .models import CreateJukeboxPayment, CreateJukeLinkData
+from .models import CreateJukeboxPayment, CreateJukeLinkData, Jukebox
 
 
 @jukebox_ext.get("/api/v1/jukebox")
@@ -74,15 +74,17 @@ async def api_check_credentials_check(juke_id: str):
     status_code=HTTPStatus.CREATED,
     dependencies=[Depends(require_admin_key)],
 )
-@jukebox_ext.put("/api/v1/jukebox/{juke_id}", status_code=HTTPStatus.OK)
-async def api_create_update_jukebox(
-    data: CreateJukeLinkData, juke_id: Optional[str]
-):
-    if juke_id:
-        jukebox = await update_jukebox(data, juke_id=juke_id)
-    else:
-        jukebox = await create_jukebox(data)
-    return jukebox
+async def api_create_jukebox(
+    data: CreateJukeLinkData
+) -> Jukebox:
+    return await create_jukebox(data)
+
+
+@jukebox_ext.put("/api/v1/jukebox/{juke_id}", dependencies=[Depends(require_admin_key)])
+async def api_update_jukebox(
+    data: CreateJukeLinkData, juke_id: str
+) -> Jukebox:
+    return await update_jukebox(data, juke_id=juke_id)
 
 
 @jukebox_ext.delete(
