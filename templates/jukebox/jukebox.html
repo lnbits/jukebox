@@ -258,6 +258,7 @@
     },
     created() {
       this.getCurrent()
+      window.setInterval(this.getCurrent, 10 * 1000)
       this.playlists = JSON.parse('{{ playlists | tojson }}')
       this.selectedWallet.inkey = '{{ inkey }}'
       self = this
