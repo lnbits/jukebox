@@ -110,11 +110,11 @@ methods: {
     }
   },
 
-  updateJukebox(linkId) {
+  async updateJukebox(linkId) {
     const link = this.JukeboxLinks.find(link => link.id === linkId);
     this.jukeboxDialog.data = { ...link._data };
-    this.refreshDevices();
-    this.refreshPlaylists();
+    await this.refreshDevices(); // Ensure refreshDevices completes before moving to the next line
+    await this.refreshPlaylists(); // Ensure refreshPlaylists completes before moving to the next line
     this.step = 4;
     this.jukeboxDialog.data.sp_device = [];
     this.jukeboxDialog.data.sp_playlists = [];
