@@ -387,64 +387,6 @@ async def api_get_jukebox_invoice_paid(
     raise HTTPException(status_code=HTTPStatus.OK, detail="Invoice not paid")
 
 
-############################GET TRACKS
-
-
-@jukebox_ext.get("/api/v1/jukebox/jb/currently/{juke_id}")
-async def api_get_jukebox_currently(juke_id: str, retry: bool = Query(False)):
-    jukebox = await get_jukebox(juke_id)
-    if not jukebox:
-        raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="No jukebox")
-    async with httpx.AsyncClient() as client:
-        try:
-            assert jukebox.sp_access_token
-            r = await client.get(
-                "https://api.spotify.com/v1/me/player/currently-playing?market=ES",
-                timeout=40,
-                headers={"Authorization": "Bearer " + jukebox.sp_access_token},
-            )
-            if r.status_code == 204:
-                raise HTTPException(status_code=HTTPStatus.OK, detail="Nothing")
-            elif r.status_code == 200:
-                try:
-                    response = r.json()
-
-                    track = {
-                        "id": response["item"]["id"],
-                        "name": response["item"]["name"],
-                        "album": response["item"]["album"]["name"],
-                        "artist": response["item"]["artists"][0]["name"],
-                        "image": response["item"]["album"]["images"][0]["url"],
-                    }
-                    return track
-                except:
-                    raise HTTPException(
-                        status_code=HTTPStatus.NOT_FOUND, detail="Something went wrong"
-                    )
-
-            elif r.status_code == 401:
-                token = await api_get_token(juke_id)
-                if token is False:
-                    raise HTTPException(
-                        status_code=HTTPStatus.FORBIDDEN, detail="Invoice not paid"
-                    )
-                elif retry:
-                    raise HTTPException(
-                        status_code=HTTPStatus.FORBIDDEN, detail="Failed to get auth"
-                    )
-                else:
-                    return await api_get_jukebox_currently(retry=True, juke_id=juke_id)
-            else:
-                raise HTTPException(
-                    status_code=HTTPStatus.NOT_FOUND, detail="Something went wrong"
-                )
-        except:
-            raise HTTPException(
-                status_code=HTTPStatus.NOT_FOUND,
-                detail="Something went wrong, or no song is playing yet",
-            )
-
-
 ############################GET QUEUE
 
 

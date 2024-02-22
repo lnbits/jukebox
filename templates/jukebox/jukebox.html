@@ -245,10 +245,6 @@
                   }
                 })
             }, 3000)
-
-            setTimeout(() => {
-              self.getCurrent()
-            }, 500)
           })
           .catch(err => {
             self.$q.notify({
@@ -258,18 +254,6 @@
                 '<center>Device is not connected! <br/> Ask the host to turn on their device and have Spotify open</center>',
               timeout: 5000
             })
-          })
-      },
-      getCurrent() {
-        LNbits.api
-          .request('GET', '/jukebox/api/v1/jukebox/jb/currently/{{juke_id}}')
-          .then(function (res) {
-            if (res.data.id) {
-              self.currentlyPlaying = res.data
-            }
-          })
-          .catch(function (error) {
-            LNbits.utils.notifyApiError(error)
           })
       },
       getQueue() {
