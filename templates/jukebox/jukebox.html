@@ -6,10 +6,13 @@
         <q-card-section horizontal>
           <q-card-section class="q-pt-xs">
             <div class="text-overline">Currently playing</div>
+            <div v-if="currentPlay">
+
             {% raw %}
             <div class="text-h5 q-mt-sm q-mb-xs">{{ currentPlay.name }}</div>
             <div class="text-caption text-grey">{{ currentPlay.artist }}</div>
             {% endraw %}
+          </div>
           </q-card-section>
   
           <q-card-section class="col-5 flex q-ml-auto">
@@ -39,9 +42,19 @@
     </q-card-section>
     <q-card-section class="q-pa-none">
       <q-separator></q-separator>
+      <q-item v-if="!currentPlaylist.length" v-for="k, i in Array.from(Array(5))" :key="i">
+        <q-item-section>
+          <q-item-label>
+            <q-skeleton type="text"></q-skeleton>
+          </q-item-label>
+          <q-item-label caption>
+            <q-skeleton type="text" width="65%"></q-skeleton>
+          </q-item-label>
+        </q-item-section>
+      </q-item>
       <q-virtual-scroll
         style="max-height: 300px;"
-        :items="currentPlaylist"
+        :items="filteredPlaylist"
         separator
       >
         <template v-slot="{ item, index }">
@@ -60,6 +73,14 @@
           </q-item>
         </template>
       </q-virtual-scroll>
+    </q-card-section>
+    <q-separator></q-separator>
+    <q-card-section class="q-mt-md">
+      <q-input outlined v-model="searchPlaylist" label="Search..." maxlength="12" dense>
+        <template v-slot:append>
+          <q-icon name="searchPlaylist !== '' ? 'close' : 'search" @click="searchPlaylist = ''" class="cursor-pointer" ></q-icon>
+        </template>
+      </q-input>
     </q-card-section>
   </q-card>
 </div>
@@ -162,12 +183,24 @@
           data: null,
           dismissMsg: null,
           paymentChecker: null
-        }
+        },
+        searchPlaylist: ''
       }
     },
     computed: {
       currentPlay() {
-        return this.currentlyPlaying
+        return this.currentlyPlaying ?? {}
+      },
+      filteredPlaylist() {
+        if (this.searchPlaylist === '' || this.searchPlaylist.length < 2) {
+          return this.currentPlaylist
+        }
+        return this.currentPlaylist.filter(
+          song =>
+            song.name.toLowerCase().includes(this.searchPlaylist.toLowerCase()) ||
+            song.album.toLowerCase().includes(this.searchPlaylist.toLowerCase()) ||
+            song.artist.toLowerCase().includes(this.searchPlaylist.toLowerCase())
+        )
       }
     },
     methods: {
@@ -191,7 +224,6 @@
               song_id
           )
           .then(function (response) {
-            console.log(response.data)
             self.receive.paymentReq = response.data.invoice
             self.receive.paymentHash = response.data.payment_hash
             self.receive.dialogues.second = true
@@ -210,7 +242,6 @@
                     '/{{ juke_id }}'
                 )
                 .then(function (res) {
-                  console.log(res)
                   if (res.data.paid == true) {
                     clearInterval(dialog.paymentChecker)
                     LNbits.api
@@ -222,9 +253,6 @@
                           self.receive.paymentHash
                       )
                       .then(function (ress) {
-                        console.log('ress')
-                        console.log(ress)
-                        console.log('ress')
                         if (ress.data.song_id == self.receive.id) {
                           clearInterval(dialog.paymentChecker)
                           dialog.dismissMsg()
@@ -263,7 +291,7 @@
             let {playing, queue} = res.data
             queue = new Map(queue.map(s => [s.id, s]).filter(s => s.id !== playing.id))
             this.currentlyPlaying = playing
-            this.queue = [...queue.values()]
+            this.queue = [...queue.values()].reverse()
           })
           .catch(function (error) {
             LNbits.utils.notifyApiError(error)
@@ -292,17 +320,16 @@
       this.getQueue()
       this.playlists = JSON.parse('{{ playlists | tojson }}')
       this.selectedWallet.inkey = '{{ inkey }}'
-      self = this
       LNbits.api
         .request(
           'GET',
           '/jukebox/api/v1/jukebox/jb/playlist/' +
             '{{ juke_id }}' +
             '/' +
-            self.playlists[0].split(',')[0].split('-')[1]
+            this.playlists[0].split(',')[0].split('-')[1]
         )
-        .then(function (response) {
-          self.currentPlaylist = response.data
+        .then((response) => {
+          this.currentPlaylist = response.data
         })
         .catch(err => {
           LNbits.utils.notifyApiError(err)

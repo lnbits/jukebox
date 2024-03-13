@@ -2,11 +2,13 @@ import base64
 import json
 from http import HTTPStatus
 from typing import Optional
+from urllib import response
 
 import httpx
 from fastapi import Depends, Query
 from starlette.exceptions import HTTPException
 from starlette.responses import HTMLResponse
+from loguru import logger
 
 from lnbits.core.services import create_invoice
 from lnbits.core.views.api import api_payment
@@ -96,8 +98,6 @@ async def api_delete_item(juke_id: str):
 
 ################JUKEBOX ENDPOINTS##################
 
-######GET ACCESS TOKEN######
-
 
 @jukebox_ext.get("/api/v1/jukebox/jb/playlist/{juke_id}/{sp_playlist}")
 async def api_get_jukebox_song(
@@ -108,43 +108,115 @@ async def api_get_jukebox_song(
     jukebox = await get_jukebox(juke_id)
     if not jukebox:
         raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="No Jukeboxes")
+
     tracks = []
     async with httpx.AsyncClient() as client:
         try:
             assert jukebox.sp_access_token
-            r = await client.get(
-                "https://api.spotify.com/v1/playlists/" + sp_playlist + "/tracks",
-                timeout=40,
-                headers={"Authorization": "Bearer " + jukebox.sp_access_token},
-            )
-            if "items" not in r.json():
-                if r.status_code == 401:
-                    token = await api_get_token(juke_id)
-                    if token is False:
-                        return False
-                    elif retry:
-                        raise HTTPException(
-                            status_code=HTTPStatus.FORBIDDEN,
-                            detail="Failed to get auth",
-                        )
-                    else:
-                        return await api_get_jukebox_song(
-                            juke_id, sp_playlist, retry=True
-                        )
-                return r
-            for item in r.json()["items"]:
-                tracks.append(
-                    {
-                        "id": item["track"]["id"],
-                        "name": item["track"]["name"],
-                        "album": item["track"]["album"]["name"],
-                        "artist": item["track"]["artists"][0]["name"],
-                        "image": item["track"]["album"]["images"][0]["url"],
-                    }
+            url = f"https://api.spotify.com/v1/playlists/{sp_playlist}/tracks"
+            while url is not None:
+                r = await client.get(
+                    url,
+                    timeout=40,
+                    headers={"Authorization": "Bearer " + jukebox.sp_access_token},
                 )
-        except:
-            pass
+                response = r.json()
+                logger.debug(f"#####URL: {url}")
+                if not response["items"]:
+                    if r.status_code == 401:
+                        token = await api_get_token(juke_id)
+                        if token is False:
+                            return False
+                        elif retry:
+                            raise HTTPException(
+                                status_code=HTTPStatus.FORBIDDEN,
+                                detail="Failed to get auth",
+                            )
+                        else:
+                            return await api_get_jukebox_song(
+                                juke_id, sp_playlist, retry=True
+                            )
+                    return r
+                try:
+                    for item in response["items"]:
+                        if not item["track"]:
+                            continue
+                        tracks.append(
+                            {
+                                "id": item["track"]["id"],
+                                "name": item["track"]["name"],
+                                "album": item["track"]["album"]["name"],
+                                "artist": item["track"]["artists"][0]["name"],
+                                "image": (
+                                    item["track"]["album"]["images"][0]["url"]
+                                    if item["track"]["album"]["images"]
+                                    else None
+                                ),
+                            }
+                        )
+                except Exception as e:
+                    logger.error(f"Error loop: {e}")
+                    pass
+
+                # Check if there are more pages
+                url = response["next"] or None
+                logger.debug(f"#####NEXT: {url}")
+
+        except Exception as e:
+            # Handle exceptions appropriately
+            logger.error(f"Error: {e}")
+
     return [track for track in tracks]
+
+
+# @jukebox_ext.get("/api/v1/jukebox/jb/playlist/{juke_id}/{sp_playlist}")
+# async def api_get_jukebox_song(
+#     juke_id: str,
+#     sp_playlist: str,
+#     retry: bool = Query(False),
+# ):
+#     jukebox = await get_jukebox(juke_id)
+#     if not jukebox:
+#         raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="No Jukeboxes")
+#     tracks = []
+#     async with httpx.AsyncClient() as client:
+#         try:
+#             assert jukebox.sp_access_token
+#             r = await client.get(
+#                 "https://api.spotify.com/v1/playlists/" + sp_playlist + "/tracks",
+#                 timeout=40,
+#                 headers={"Authorization": "Bearer " + jukebox.sp_access_token},
+#             )
+#             if "items" not in r.json():
+#                 if r.status_code == 401:
+#                     token = await api_get_token(juke_id)
+#                     if token is False:
+#                         return False
+#                     elif retry:
+#                         raise HTTPException(
+#                             status_code=HTTPStatus.FORBIDDEN,
+#                             detail="Failed to get auth",
+#                         )
+#                     else:
+#                         return await api_get_jukebox_song(
+#                             juke_id, sp_playlist, retry=True
+#                         )
+#                 return r
+#             for item in r.json()["items"]:
+#                 tracks.append(
+#                     {
+#                         "id": item["track"]["id"],
+#                         "name": item["track"]["name"],
+#                         "album": item["track"]["album"]["name"],
+#                         "artist": item["track"]["artists"][0]["name"],
+#                         "image": item["track"]["album"]["images"][0]["url"],
+#                     }
+#                 )
+#         except:
+#             pass
+#     return [track for track in tracks]
+
+######GET ACCESS TOKEN######
 
 
 async def api_get_token(juke_id):
@@ -410,14 +482,16 @@ async def api_get_jukebox_queue(
             elif r.status_code == 200:
                 try:
                     response = r.json()
-                    item = response["currently_playing"]
-                    track = {
-                        "id": item["id"],
-                        "name": item["name"],
-                        "album": item["album"]["name"],
-                        "artist": item["artists"][0]["name"],
-                        "image": item["album"]["images"][0]["url"],
-                    }
+                    track = None
+                    if response["currently_playing"] not in (None, ""):
+                        item = response["currently_playing"]
+                        track = {
+                            "id": item["id"],
+                            "name": item["name"],
+                            "album": item["album"]["name"],
+                            "artist": item["artists"][0]["name"],
+                            "image": item["album"]["images"][0]["url"],
+                        }
                     tracks = []
                     for _item in response["queue"]:
                         tracks.append(

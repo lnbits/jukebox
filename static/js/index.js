@@ -15,7 +15,6 @@ var mapJukebox = obj => {
       playlistsar.push(playlists[i].split('-')[0])
     }
     obj.playlist = playlistsar.join()
-    console.log(obj)
     return obj
   } else {
     return
@@ -93,7 +92,6 @@ methods: {
     try {
       const response = await LNbits.api.request('GET', '/jukebox/api/v1/jukebox', this.g.user.wallets[0].adminkey);
       this.JukeboxLinks = response.data.map(obj => mapJukebox(obj));
-      console.log(this.JukeboxLinks);
     } catch (error) {
       console.error('Error in getJukeboxes:', error);
     }
@@ -115,6 +113,7 @@ methods: {
     this.jukeboxDialog.data = { ...link._data };
     await this.refreshDevices(); // Ensure refreshDevices completes before moving to the next line
     await this.refreshPlaylists(); // Ensure refreshPlaylists completes before moving to the next line
+    console.log(this.devices)
     this.step = 4;
     this.jukeboxDialog.data.sp_device = [];
     this.jukeboxDialog.data.sp_playlists = [];
@@ -165,7 +164,7 @@ methods: {
           this.fetchAccessToken(response.data.sp_access_token);
           if (this.jukeboxDialog.data.sp_access_token) {
             this.refreshPlaylists();
-            this.refreshDevices();
+            await this.refreshDevices();
             setTimeout(() => {
               if (this.devices.length < 1 || this.playlists.length < 1) {
                 this.$q.notify({
@@ -215,13 +214,14 @@ methods: {
 
   async createJukebox() {
     this.jukeboxDialog.data.sp_playlists = this.jukeboxDialog.data.sp_playlists.join();
-    this.updateDB();
+    await this.updateDB();
     this.jukeboxDialog.show = false;
     this.getJukeboxes();
   },
 
   async updateDB() {
     try {
+      await LNbits.api.request('PUT', `/jukebox/api/v1/jukebox/${this.jukeboxDialog.data.sp_id}`, this.g.user.wallets[0].adminkey, this.jukeboxDialog.data);
       if (this.jukeboxDialog.data.sp_playlists && this.jukeboxDialog.data.sp_devices) {
         this.getJukeboxes();
         // this.JukeboxLinks.push(mapJukebox(response.data));
@@ -270,7 +270,6 @@ methods: {
         },
         body: body ? JSON.stringify(body) : null,
       });
-
       if (response.status === 401) {
         await this.refreshAccessToken();
         await this.deviceApi('GET', 'https://api.spotify.com/v1/me/player/devices', null);
@@ -285,8 +284,8 @@ methods: {
     }
   },
 
-  refreshDevices() {
-    this.deviceApi('GET', 'https://api.spotify.com/v1/me/player/devices', null);
+  async refreshDevices() {
+    await this.deviceApi('GET', 'https://api.spotify.com/v1/me/player/devices', null);
   },
 
   async fetchAccessToken(code) {
