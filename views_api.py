@@ -1,14 +1,12 @@
 import base64
 import json
 from http import HTTPStatus
-from typing import Optional
-from urllib import response
 
 import httpx
 from fastapi import Depends, Query
+from loguru import logger
 from starlette.exceptions import HTTPException
 from starlette.responses import HTMLResponse
-from loguru import logger
 
 from lnbits.core.services import create_invoice
 from lnbits.core.views.api import api_payment
@@ -246,7 +244,6 @@ async def api_get_jukebox_invoice(juke_id, song_id):
     if not jukebox:
         raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="No jukebox")
     try:
-
         assert jukebox.sp_device
         devices = await api_get_jukebox_device_check(juke_id)
         deviceConnected = False
