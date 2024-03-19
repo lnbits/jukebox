@@ -15,6 +15,7 @@ var mapJukebox = obj => {
       playlistsar.push(playlists[i].split('-')[0])
     }
     obj.playlist = playlistsar.join()
+    console.log(obj)
     return obj
   } else {
     return
@@ -79,307 +80,319 @@ new Vue({
     }
   },
   computed: {},
-
   methods: {
-    openQrCodeDialog(linkId) {
-      const link = this.JukeboxLinks.find(link => link.id === linkId)
-      this.qrCodeDialog.data = {...link}
-      this.qrCodeDialog.data.url = `${window.location.protocol}//${window.location.host}`
+    openQrCodeDialog: function (linkId) {
+      var link = _.findWhere(this.JukeboxLinks, {id: linkId})
+
+      this.qrCodeDialog.data = _.clone(link)
+
+      this.qrCodeDialog.data.url =
+        window.location.protocol + '//' + window.location.host
       this.qrCodeDialog.show = true
     },
+    getJukeboxes() {
+      self = this
 
-    async getJukeboxes() {
-      try {
-        const response = await LNbits.api.request(
+      LNbits.api
+        .request(
           'GET',
           '/jukebox/api/v1/jukebox',
-          this.g.user.wallets[0].adminkey
+          self.g.user.wallets[0].adminkey
         )
-        this.JukeboxLinks = response.data.map(obj => mapJukebox(obj))
-      } catch (error) {
-        console.error('Error in getJukeboxes:', error)
-      }
-    },
-
-    async deleteJukebox(jukeId) {
-      try {
-        await LNbits.utils
-          .confirmDialog('Are you sure you want to delete this Jukebox?')
-          .onOk(async () => {
-            await LNbits.api.request(
-              'DELETE',
-              `/jukebox/api/v1/jukebox/${jukeId}`,
-              this.g.user.wallets[0].adminkey
-            )
-            this.getJukeboxes()
+        .then(function (response) {
+          self.JukeboxLinks = response.data.map(function (obj) {
+            return mapJukebox(obj)
           })
-      } catch (error) {
-        LNbits.utils.notifyApiError(error)
-      }
+          console.log(self.JukeboxLinks)
+        })
     },
+    deleteJukebox(juke_id) {
+      self = this
+      LNbits.utils
+        .confirmDialog('Are you sure you want to delete this Jukebox?')
+        .onOk(function () {
+          LNbits.api
+            .request(
+              'DELETE',
+              '/jukebox/api/v1/jukebox/' + juke_id,
+              self.g.user.wallets[0].adminkey
+            )
+            .then(function (response) {
+              self.JukeboxLinks = _.reject(self.JukeboxLinks, function (obj) {
+                return obj.id === juke_id
+              })
+            })
 
-    async updateJukebox(linkId) {
-      const link = this.JukeboxLinks.find(link => link.id === linkId)
-      this.jukeboxDialog.data = {...link._data}
-      await this.refreshDevices() // Ensure refreshDevices completes before moving to the next line
-      await this.refreshPlaylists() // Ensure refreshPlaylists completes before moving to the next line
-      console.log(this.devices)
-      this.step = 4
-      this.jukeboxDialog.data.sp_device = []
-      this.jukeboxDialog.data.sp_playlists = []
-      this.jukeboxDialog.data.sp_id = this.jukeboxDialog.data.id
-      this.jukeboxDialog.data.price = String(this.jukeboxDialog.data.price)
-      this.jukeboxDialog.show = true
+            .catch(err => {
+              LNbits.utils.notifyApiError(err)
+            })
+        })
     },
+    updateJukebox: function (linkId) {
+      self = this
+      var link = _.findWhere(self.JukeboxLinks, {id: linkId})
+      self.jukeboxDialog.data = _.clone(link._data)
 
+      self.refreshDevices()
+      self.refreshPlaylists()
+
+      self.step = 4
+      self.jukeboxDialog.data.sp_device = []
+      self.jukeboxDialog.data.sp_playlists = []
+      self.jukeboxDialog.data.sp_id = self.jukeboxDialog.data.id
+      self.jukeboxDialog.data.price = String(self.jukeboxDialog.data.price)
+      self.jukeboxDialog.show = true
+    },
     closeFormDialog() {
       this.jukeboxDialog.data = {}
       this.jukeboxDialog.show = false
       this.step = 1
     },
+    submitSpotifyKeys() {
+      self = this
+      self.jukeboxDialog.data.user = self.g.user.id
 
-    async submitSpotifyKeys() {
-      this.jukeboxDialog.data.user = this.g.user.id
-      try {
-        const response = await LNbits.api.request(
+      LNbits.api
+        .request(
           'POST',
           '/jukebox/api/v1/jukebox/',
-          this.g.user.wallets[0].adminkey,
-          this.jukeboxDialog.data
+          self.g.user.wallets[0].adminkey,
+          self.jukeboxDialog.data
         )
-        if (response.data) {
-          this.jukeboxDialog.data.sp_id = response.data.id
-          this.step = 3
-        }
-      } catch (error) {
-        LNbits.utils.notifyApiError(error)
-      }
+        .then(response => {
+          if (response.data) {
+            self.jukeboxDialog.data.sp_id = response.data.id
+            self.step = 3
+          }
+        })
+        .catch(err => {
+          LNbits.utils.notifyApiError(err)
+        })
     },
-
     authAccess() {
-      this.requestAuthorization()
-      this.getSpotifyTokens()
-      this.$q.notify({
+      self = this
+      self.requestAuthorization()
+      self.getSpotifyTokens()
+      self.$q.notify({
         spinner: true,
         message: 'Processing',
         timeout: 10000
       })
     },
-
-    async getSpotifyTokens() {
-      let counter = 0
-      const timerId = setInterval(async () => {
+    getSpotifyTokens() {
+      self = this
+      var counter = 0
+      var timerId = setInterval(function () {
         counter++
-        if (!this.jukeboxDialog.data.sp_user) {
+        if (!self.jukeboxDialog.data.sp_user) {
           clearInterval(timerId)
         }
-        try {
-          const response = await LNbits.api.request(
+        LNbits.api
+          .request(
             'GET',
-            `/jukebox/api/v1/jukebox/${this.jukeboxDialog.data.sp_id}`,
-            this.g.user.wallets[0].adminkey
+            '/jukebox/api/v1/jukebox/' + self.jukeboxDialog.data.sp_id,
+            self.g.user.wallets[0].adminkey
           )
-          if (response.data.sp_access_token) {
-            this.fetchAccessToken(response.data.sp_access_token)
-            if (this.jukeboxDialog.data.sp_access_token) {
-              this.refreshPlaylists()
-              await this.refreshDevices()
-              setTimeout(() => {
-                if (this.devices.length < 1 || this.playlists.length < 1) {
-                  this.$q.notify({
-                    spinner: true,
-                    color: 'red',
-                    message:
-                      'Error! Make sure Spotify is open on the device you wish to use, has playlists, and is playing something',
-                    timeout: 10000
-                  })
-                  LNbits.api.request(
-                    'DELETE',
-                    `/jukebox/api/v1/jukebox/${response.data.id}`,
-                    this.g.user.wallets[0].adminkey
-                  )
-                  this.getJukeboxes()
-                  clearInterval(timerId)
-                  this.closeFormDialog()
-                } else {
-                  this.step = 4
-                  clearInterval(timerId)
-                }
-              }, 2000)
+          .then(response => {
+            if (response.data.sp_access_token) {
+              self.fetchAccessToken(response.data.sp_access_token)
+              if (self.jukeboxDialog.data.sp_access_token) {
+                self.refreshPlaylists()
+                self.refreshDevices()
+                setTimeout(function () {
+                  if (self.devices.length < 1 || self.playlists.length < 1) {
+                    self.$q.notify({
+                      spinner: true,
+                      color: 'red',
+                      message:
+                        'Error! Make sure Spotify is open on the device you wish to use, has playlists, and is playing something',
+                      timeout: 10000
+                    })
+                    LNbits.api
+                      .request(
+                        'DELETE',
+                        '/jukebox/api/v1/jukebox/' + response.data.id,
+                        self.g.user.wallets[0].adminkey
+                      )
+                      .then(function (response) {
+                        self.getJukeboxes()
+                      })
+                      .catch(err => {
+                        LNbits.utils.notifyApiError(err)
+                      })
+                    clearInterval(timerId)
+                    self.closeFormDialog()
+                  } else {
+                    self.step = 4
+                    clearInterval(timerId)
+                  }
+                }, 2000)
+              }
             }
-          }
-        } catch (error) {
-          LNbits.utils.notifyApiError(error)
-        }
+          })
+          .catch(err => {
+            LNbits.utils.notifyApiError(err)
+          })
       }, 3000)
     },
-
     requestAuthorization() {
-      const url = 'https://accounts.spotify.com/authorize'
-      const scope = [
-        'user-read-private',
-        'user-read-email',
-        'user-modify-playback-state',
-        'user-read-playback-position',
-        'user-library-read',
-        'streaming',
-        'user-read-playback-state',
-        'user-read-recently-played',
-        'playlist-read-private'
-      ].join(' ')
-      const redirectUri = encodeURI(
-        `${this.locationcbPath}${this.jukeboxDialog.data.sp_id}`
-      )
-      window.open(
-        `${url}?client_id=${this.jukeboxDialog.data.sp_user}&response_type=code&redirect_uri=${redirectUri}&show_dialog=true&scope=${scope}`
-      )
-    },
+      self = this
+      var url = 'https://accounts.spotify.com/authorize'
+      url += '?client_id=' + self.jukeboxDialog.data.sp_user
+      url += '&response_type=code'
+      url +=
+        '&redirect_uri=' +
+        encodeURI(self.locationcbPath + self.jukeboxDialog.data.sp_id)
+      url += '&show_dialog=true'
+      url +=
+        '&scope=user-read-private user-read-email user-modify-playback-state user-read-playback-position user-library-read streaming user-read-playback-state user-read-recently-played playlist-read-private'
 
+      window.open(url)
+    },
     openNewDialog() {
       this.jukeboxDialog.show = true
       this.jukeboxDialog.data = {}
     },
-
-    async createJukebox() {
-      this.jukeboxDialog.data.sp_playlists =
-        this.jukeboxDialog.data.sp_playlists.join()
-      await this.updateDB()
-      this.jukeboxDialog.show = false
-      this.getJukeboxes()
+    createJukebox() {
+      self = this
+      self.jukeboxDialog.data.sp_playlists =
+        self.jukeboxDialog.data.sp_playlists.join()
+      self.updateDB()
+      self.jukeboxDialog.show = false
+      self.getJukeboxes()
     },
-
-    async updateDB() {
-      try {
-        await LNbits.api.request(
+    updateDB() {
+      self = this
+      LNbits.api
+        .request(
           'PUT',
-          `/jukebox/api/v1/jukebox/${this.jukeboxDialog.data.sp_id}`,
-          this.g.user.wallets[0].adminkey,
-          this.jukeboxDialog.data
+          '/jukebox/api/v1/jukebox/' + self.jukeboxDialog.data.sp_id,
+          self.g.user.wallets[0].adminkey,
+          self.jukeboxDialog.data
         )
-        if (
-          this.jukeboxDialog.data.sp_playlists &&
-          this.jukeboxDialog.data.sp_devices
-        ) {
-          this.getJukeboxes()
-          // this.JukeboxLinks.push(mapJukebox(response.data));
-        }
-      } catch (error) {
-        console.error('Error in updateDB:', error)
-      }
-    },
-
-    async playlistApi(method, url, body) {
-      try {
-        const response = await fetch(url, {
-          method,
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer ' + this.jukeboxDialog.data.sp_access_token
-          },
-          body: body ? JSON.stringify(body) : null
+        .then(function (response) {
+          if (
+            self.jukeboxDialog.data.sp_playlists &&
+            self.jukeboxDialog.data.sp_devices
+          ) {
+            self.getJukeboxes()
+            // self.JukeboxLinks.push(mapJukebox(response.data))
+          }
         })
-
-        if (response.status === 401) {
-          await this.refreshAccessToken()
-          await this.playlistApi(
+    },
+    playlistApi(method, url, body) {
+      self = this
+      let xhr = new XMLHttpRequest()
+      xhr.open(method, url, true)
+      xhr.setRequestHeader('Content-Type', 'application/json')
+      xhr.setRequestHeader(
+        'Authorization',
+        'Bearer ' + this.jukeboxDialog.data.sp_access_token
+      )
+      xhr.send(body)
+      xhr.onload = function () {
+        if (xhr.status == 401) {
+          self.refreshAccessToken()
+          self.playlistApi(
             'GET',
             'https://api.spotify.com/v1/me/playlists',
             null
           )
-          return // Exit to prevent further processing in case of token refresh
         }
-
-        const responseObj = await response.json()
-        this.jukeboxDialog.data.playlists = responseObj.items.map(
-          item => `${item.name}-${item.id}`
-        )
-        this.playlists = [...this.jukeboxDialog.data.playlists]
-      } catch (error) {
-        console.error('Error in playlistApi:', error)
+        let responseObj = JSON.parse(xhr.response)
+        self.jukeboxDialog.data.playlists = null
+        self.playlists = []
+        self.jukeboxDialog.data.playlists = []
+        var i
+        for (i = 0; i < responseObj.items.length; i++) {
+          self.playlists.push(
+            responseObj.items[i].name + '-' + responseObj.items[i].id
+          )
+        }
       }
     },
-
     refreshPlaylists() {
-      this.playlistApi('GET', 'https://api.spotify.com/v1/me/playlists', null)
+      self = this
+      self.playlistApi('GET', 'https://api.spotify.com/v1/me/playlists', null)
     },
-
-    async deviceApi(method, url, body) {
-      try {
-        const response = await fetch(url, {
-          method,
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer ' + this.jukeboxDialog.data.sp_access_token
-          },
-          body: body ? JSON.stringify(body) : null
-        })
-        if (response.status === 401) {
-          await this.refreshAccessToken()
-          await this.deviceApi(
+    deviceApi(method, url, body) {
+      self = this
+      let xhr = new XMLHttpRequest()
+      xhr.open(method, url, true)
+      xhr.setRequestHeader('Content-Type', 'application/json')
+      xhr.setRequestHeader(
+        'Authorization',
+        'Bearer ' + this.jukeboxDialog.data.sp_access_token
+      )
+      xhr.send(body)
+      xhr.onload = function () {
+        if (xhr.status == 401) {
+          self.refreshAccessToken()
+          self.deviceApi(
             'GET',
             'https://api.spotify.com/v1/me/player/devices',
             null
           )
-          return // Exit to prevent further processing in case of token refresh
         }
+        let responseObj = JSON.parse(xhr.response)
+        self.jukeboxDialog.data.devices = []
 
-        const responseObj = await response.json()
-        this.jukeboxDialog.data.devices = responseObj.devices.map(
-          device => `${device.name}-${device.id}`
-        )
-        this.devices = [...this.jukeboxDialog.data.devices]
-      } catch (error) {
-        console.error('Error in deviceApi:', error)
+        self.devices = []
+        var i
+        for (i = 0; i < responseObj.devices.length; i++) {
+          self.devices.push(
+            responseObj.devices[i].name + '-' + responseObj.devices[i].id
+          )
+        }
       }
     },
-
-    async refreshDevices() {
-      await this.deviceApi(
+    refreshDevices() {
+      self = this
+      self.deviceApi(
         'GET',
         'https://api.spotify.com/v1/me/player/devices',
         null
       )
     },
-
-    async fetchAccessToken(code) {
+    fetchAccessToken(code) {
+      self = this
       let body = 'grant_type=authorization_code'
-      body += `&code=${code}`
-      body += `&redirect_uri=${encodeURI(
-        this.locationcbPath + this.jukeboxDialog.data.sp_id
-      )}`
-      await this.callAuthorizationApi(body)
-    },
+      body += '&code=' + code
+      body +=
+        '&redirect_uri=' +
+        encodeURI(self.locationcbPath + self.jukeboxDialog.data.sp_id)
 
-    async refreshAccessToken() {
+      self.callAuthorizationApi(body)
+    },
+    refreshAccessToken() {
+      self = this
       let body = 'grant_type=refresh_token'
-      body += `&refresh_token=${this.jukeboxDialog.data.sp_refresh_token}`
-      body += `&client_id=${this.jukeboxDialog.data.sp_user}`
-      await this.callAuthorizationApi(body)
+      body += '&refresh_token=' + self.jukeboxDialog.data.sp_refresh_token
+      body += '&client_id=' + self.jukeboxDialog.data.sp_user
+      self.callAuthorizationApi(body)
     },
-
-    async callAuthorizationApi(body) {
-      try {
-        const response = await fetch('https://accounts.spotify.com/api/token', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            Authorization:
-              'Basic ' +
-              btoa(
-                `${this.jukeboxDialog.data.sp_user}:${this.jukeboxDialog.data.sp_secret}`
-              )
-          },
-          body: body
-        })
-
-        const responseObj = await response.json()
+    callAuthorizationApi(body) {
+      self = this
+      let xhr = new XMLHttpRequest()
+      xhr.open('POST', 'https://accounts.spotify.com/api/token', true)
+      xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded')
+      xhr.setRequestHeader(
+        'Authorization',
+        'Basic ' +
+          btoa(
+            self.jukeboxDialog.data.sp_user +
+              ':' +
+              self.jukeboxDialog.data.sp_secret
+          )
+      )
+      xhr.send(body)
+      xhr.onload = function () {
+        let responseObj = JSON.parse(xhr.response)
         if (responseObj.access_token) {
-          this.jukeboxDialog.data.sp_access_token = responseObj.access_token
-          this.jukeboxDialog.data.sp_refresh_token = responseObj.refresh_token
-          this.updateDB()
+          self.jukeboxDialog.data.sp_access_token = responseObj.access_token
+          self.jukeboxDialog.data.sp_refresh_token = responseObj.refresh_token
+          self.updateDB()
         }
-      } catch (error) {
-        console.error('Error in callAuthorizationApi:', error)
       }
     }
   },

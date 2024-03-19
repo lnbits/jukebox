@@ -1,10 +1,10 @@
 import base64
 import json
 from http import HTTPStatus
+from typing import Optional
 
 import httpx
 from fastapi import Depends, Query
-from loguru import logger
 from starlette.exceptions import HTTPException
 from starlette.responses import HTMLResponse
 
@@ -74,12 +74,16 @@ async def api_check_credentials_check(juke_id: str):
     status_code=HTTPStatus.CREATED,
     dependencies=[Depends(require_admin_key)],
 )
-async def api_create_jukebox(data: CreateJukeLinkData) -> Jukebox:
+async def api_create_jukebox(
+    data: CreateJukeLinkData
+) -> Jukebox:
     return await create_jukebox(data)
 
 
 @jukebox_ext.put("/api/v1/jukebox/{juke_id}", dependencies=[Depends(require_admin_key)])
-async def api_update_jukebox(data: CreateJukeLinkData, juke_id: str) -> Jukebox:
+async def api_update_jukebox(
+    data: CreateJukeLinkData, juke_id: str
+) -> Jukebox:
     return await update_jukebox(data, juke_id=juke_id)
 
 
@@ -88,9 +92,15 @@ async def api_update_jukebox(data: CreateJukeLinkData, juke_id: str) -> Jukebox:
 )
 async def api_delete_item(juke_id: str):
     await delete_jukebox(juke_id)
+    # try:
+    #     return [{**jukebox} for jukebox in await get_jukeboxs(wallet.wallet.user)]
+    # except:
+    #     raise HTTPException(status_code=HTTPStatus.NO_CONTENT, detail="No Jukebox")
 
 
 ################JUKEBOX ENDPOINTS##################
+
+######GET ACCESS TOKEN######
 
 
 @jukebox_ext.get("/api/v1/jukebox/jb/playlist/{juke_id}/{sp_playlist}")
@@ -102,68 +112,43 @@ async def api_get_jukebox_song(
     jukebox = await get_jukebox(juke_id)
     if not jukebox:
         raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="No Jukeboxes")
-
     tracks = []
     async with httpx.AsyncClient() as client:
         try:
             assert jukebox.sp_access_token
-            url = f"https://api.spotify.com/v1/playlists/{sp_playlist}/tracks"
-            while url is not None:
-                r = await client.get(
-                    url,
-                    timeout=40,
-                    headers={"Authorization": "Bearer " + jukebox.sp_access_token},
-                )
-                response = r.json()
-                logger.debug(f"#####URL: {url}")
-                if not response["items"]:
-                    if r.status_code == 401:
-                        token = await api_get_token(juke_id)
-                        if token is False:
-                            return False
-                        elif retry:
-                            raise HTTPException(
-                                status_code=HTTPStatus.FORBIDDEN,
-                                detail="Failed to get auth",
-                            )
-                        else:
-                            return await api_get_jukebox_song(
-                                juke_id, sp_playlist, retry=True
-                            )
-                    return r
-                try:
-                    for item in response["items"]:
-                        if not item["track"] or not item["track"]["id"]:
-                            continue
-                        tracks.append(
-                            {
-                                "id": item["track"]["id"],
-                                "name": item["track"]["name"],
-                                "album": item["track"]["album"]["name"],
-                                "artist": item["track"]["artists"][0]["name"],
-                                "image": (
-                                    item["track"]["album"]["images"][0]["url"]
-                                    if item["track"]["album"]["images"]
-                                    else None
-                                ),
-                            }
+            r = await client.get(
+                "https://api.spotify.com/v1/playlists/" + sp_playlist + "/tracks",
+                timeout=40,
+                headers={"Authorization": "Bearer " + jukebox.sp_access_token},
+            )
+            if "items" not in r.json():
+                if r.status_code == 401:
+                    token = await api_get_token(juke_id)
+                    if token is False:
+                        return False
+                    elif retry:
+                        raise HTTPException(
+                            status_code=HTTPStatus.FORBIDDEN,
+                            detail="Failed to get auth",
                         )
-                except Exception as e:
-                    logger.error(f"Error loop: {e}")
-                    pass
-
-                # Check if there are more pages
-                url = response["next"] or None
-                logger.debug(f"#####NEXT: {url}")
-
-        except Exception as e:
-            # Handle exceptions appropriately
-            logger.error(f"Error: {e}")
-
+                    else:
+                        return await api_get_jukebox_song(
+                            juke_id, sp_playlist, retry=True
+                        )
+                return r
+            for item in r.json()["items"]:
+                tracks.append(
+                    {
+                        "id": item["track"]["id"],
+                        "name": item["track"]["name"],
+                        "album": item["track"]["album"]["name"],
+                        "artist": item["track"]["artists"][0]["name"],
+                        "image": item["track"]["album"]["images"][0]["url"],
+                    }
+                )
+        except:
+            pass
     return [track for track in tracks]
-
-
-######GET ACCESS TOKEN######
 
 
 async def api_get_token(juke_id):
@@ -204,7 +189,9 @@ async def api_get_token(juke_id):
 
 
 @jukebox_ext.get("/api/v1/jukebox/jb/{juke_id}")
-async def api_get_jukebox_device_check(juke_id: str, retry: bool = Query(False)):
+async def api_get_jukebox_device_check(
+    juke_id: str, retry: bool = Query(False)
+):
     jukebox = await get_jukebox(juke_id)
     if not jukebox:
         raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="No Jukeboxes")
@@ -244,6 +231,7 @@ async def api_get_jukebox_invoice(juke_id, song_id):
     if not jukebox:
         raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="No jukebox")
     try:
+
         assert jukebox.sp_device
         devices = await api_get_jukebox_device_check(juke_id)
         deviceConnected = False
@@ -275,7 +263,9 @@ async def api_get_jukebox_invoice(juke_id, song_id):
 
 
 @jukebox_ext.get("/api/v1/jukebox/jb/checkinvoice/{pay_hash}/{juke_id}")
-async def api_get_jukebox_invoice_check(pay_hash: str, juke_id: str):
+async def api_get_jukebox_invoice_check(
+    pay_hash: str, juke_id: str
+):
     try:
         await get_jukebox(juke_id)
     except:
@@ -405,12 +395,13 @@ async def api_get_jukebox_invoice_paid(
     raise HTTPException(status_code=HTTPStatus.OK, detail="Invoice not paid")
 
 
-############################GET QUEUE
+############################GET TRACKS
 
 
-@jukebox_ext.get("/api/v1/jukebox/jb/queue/{juke_id}")
-async def api_get_jukebox_queue(
+@jukebox_ext.get("/api/v1/jukebox/jb/currently/{juke_id}")
+async def api_get_jukebox_currently(
     juke_id: str,
+    retry: bool = Query(False)
 ):
     jukebox = await get_jukebox(juke_id)
     if not jukebox:
@@ -419,7 +410,7 @@ async def api_get_jukebox_queue(
         try:
             assert jukebox.sp_access_token
             r = await client.get(
-                "https://api.spotify.com/v1/me/player/queue",
+                "https://api.spotify.com/v1/me/player/currently-playing?market=ES",
                 timeout=40,
                 headers={"Authorization": "Bearer " + jukebox.sp_access_token},
             )
@@ -428,28 +419,15 @@ async def api_get_jukebox_queue(
             elif r.status_code == 200:
                 try:
                     response = r.json()
-                    track = None
-                    if response["currently_playing"] not in (None, ""):
-                        item = response["currently_playing"]
-                        track = {
-                            "id": item["id"],
-                            "name": item["name"],
-                            "album": item["album"]["name"],
-                            "artist": item["artists"][0]["name"],
-                            "image": item["album"]["images"][0]["url"],
-                        }
-                    tracks = []
-                    for _item in response["queue"]:
-                        tracks.append(
-                            {
-                                "id": _item["id"],
-                                "name": _item["name"],
-                                "album": _item["album"]["name"],
-                                "artist": _item["artists"][0]["name"],
-                                "image": _item["album"]["images"][0]["url"],
-                            }
-                        )
-                    return {"playing": track, "queue": tracks}
+
+                    track = {
+                        "id": response["item"]["id"],
+                        "name": response["item"]["name"],
+                        "album": response["item"]["album"]["name"],
+                        "artist": response["item"]["artists"][0]["name"],
+                        "image": response["item"]["album"]["images"][0]["url"],
+                    }
+                    return track
                 except:
                     raise HTTPException(
                         status_code=HTTPStatus.NOT_FOUND, detail="Something went wrong"
@@ -461,6 +439,12 @@ async def api_get_jukebox_queue(
                     raise HTTPException(
                         status_code=HTTPStatus.FORBIDDEN, detail="Invoice not paid"
                     )
+                elif retry:
+                    raise HTTPException(
+                        status_code=HTTPStatus.FORBIDDEN, detail="Failed to get auth"
+                    )
+                else:
+                    return await api_get_jukebox_currently(retry=True, juke_id=juke_id)
             else:
                 raise HTTPException(
                     status_code=HTTPStatus.NOT_FOUND, detail="Something went wrong"
