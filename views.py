@@ -31,8 +31,6 @@ async def connect_to_jukebox(request: Request, juke_id):
             status_code=HTTPStatus.NOT_FOUND, detail="Jukebox does not exist."
         )
     devices = await api_get_jukebox_device_check(juke_id)
-    logger.debug(devices)
-    logger.debug(jukebox.sp_device)
     deviceConnected = False
     assert jukebox.sp_device
     assert jukebox.sp_playlists

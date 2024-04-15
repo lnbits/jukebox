@@ -115,7 +115,6 @@ async def api_get_jukebox_song(
                     headers={"Authorization": "Bearer " + jukebox.sp_access_token},
                 )
                 response = r.json()
-                logger.debug(f"#####URL: {url}")
                 if not response["items"]:
                     if r.status_code == 401:
                         token = await api_get_token(juke_id)
@@ -154,7 +153,6 @@ async def api_get_jukebox_song(
 
                 # Check if there are more pages
                 url = response["next"] or None
-                logger.debug(f"#####NEXT: {url}")
 
         except Exception as e:
             # Handle exceptions appropriately
