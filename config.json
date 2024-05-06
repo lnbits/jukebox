@@ -2,6 +2,46 @@
   "name": "Jukebox",
   "short_description": "Spotify jukebox middleware",
   "tile": "/jukebox/static/image/jukebox.png",
-  "contributors": ["benarc"],
-  "min_lnbits_version": "0.11.0"
+  "min_lnbits_version": "0.11.0",
+  "contributors": [
+    {
+      "name": "Ben Arc",
+      "uri": "mailto:ben@lnbits.com",
+      "role": "Developer"
+    },
+    {
+      "name": "Daniel Pyrathon",
+      "uri": "https://twitter.com/pirosb3/status/1056263089128161280",
+      "role": "Original Idea"
+    },
+    {
+      "name": "talvasconcelos",
+      "uri": "https://github.com/talvasconcelos",
+      "role": "Developer"
+    },
+    {
+      "name": "stick",
+      "uri": "https://github.com/prusnak",
+      "role": "Developer"
+    },
+    {
+      "name": "ssurfertuga",
+      "uri": "https://github.com/ssurfertuga",
+      "role": "Developer"
+    }
+  ],
+  "images": [
+    {
+      "uri": "https://raw.githubusercontent.com/lnbits/jukebox/main/static/image/1.png"
+    },
+    {
+      "uri": "https://raw.githubusercontent.com/lnbits/jukebox/main/static/image/2.png"
+    },
+    {
+      "uri": "https://raw.githubusercontent.com/lnbits/jukebox/main/static/image/3.png"
+    }
+  ],
+  "description_md": "https://raw.githubusercontent.com/lnbits/jukebox/main/description.md",
+  "terms_and_conditions_md": "https://raw.githubusercontent.com/lnbits/jukebox/main/toc.md",
+  "license": "MIT"
 }
