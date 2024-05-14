@@ -2,7 +2,7 @@
   "name": "Jukebox",
   "short_description": "Spotify jukebox middleware",
   "tile": "/jukebox/static/image/jukebox.png",
-  "min_lnbits_version": "0.11.0",
+  "min_lnbits_version": "0.12.5",
   "contributors": [
     {
       "name": "Ben Arc",
