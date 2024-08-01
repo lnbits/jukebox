@@ -1,16 +1,21 @@
 from typing import List, Optional, Union
 
+from lnbits.db import Database
 from lnbits.helpers import urlsafe_short_hash
 
-from . import db
 from .models import CreateJukeboxPayment, CreateJukeLinkData, Jukebox, JukeboxPayment
+
+db = Database("ext_jukebox")
 
 
 async def create_jukebox(data: CreateJukeLinkData) -> Jukebox:
     juke_id = urlsafe_short_hash()
     await db.execute(
         """
-        INSERT INTO jukebox.jukebox (id, "user", title, wallet, sp_user, sp_secret, sp_access_token, sp_refresh_token, sp_device, sp_playlists, price, profit)
+        INSERT INTO jukebox.jukebox (
+            id, "user", title, wallet, sp_user, sp_secret, sp_access_token,
+            sp_refresh_token, sp_device, sp_playlists, price, profit
+        )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
