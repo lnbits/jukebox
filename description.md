@@ -1,4 +1,4 @@
-Create a paid Spotify Jukebox! 
+Create a paid Spotify Jukebox!
 
 1. Connect to your Spotify account.
 2. Select your spotify playlist(s) you want the extension to use.

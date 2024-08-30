@@ -1,18 +1,18 @@
 import base64
 import json
 from http import HTTPStatus
+from typing import Optional
 
 import httpx
-from fastapi import Depends, Query
+from fastapi import APIRouter, Depends, Query
+from lnbits.core.crud import get_standalone_payment
+from lnbits.core.models import WalletTypeInfo
+from lnbits.core.services import create_invoice
+from lnbits.decorators import require_admin_key
 from loguru import logger
 from starlette.exceptions import HTTPException
 from starlette.responses import HTMLResponse
 
-from lnbits.core.services import create_invoice
-from lnbits.core.views.api import api_payment
-from lnbits.decorators import WalletTypeInfo, require_admin_key
-
-from . import jukebox_ext
 from .crud import (
     create_jukebox,
     create_jukebox_payment,
@@ -25,8 +25,10 @@ from .crud import (
 )
 from .models import CreateJukeboxPayment, CreateJukeLinkData, Jukebox
 
+jukebox_api_router = APIRouter()
 
-@jukebox_ext.get("/api/v1/jukebox")
+
+@jukebox_api_router.get("/api/v1/jukebox")
 async def api_get_jukeboxs(
     wallet: WalletTypeInfo = Depends(require_admin_key),
 ):
@@ -36,14 +38,18 @@ async def api_get_jukeboxs(
         jukeboxs = [jukebox.dict() for jukebox in await get_jukeboxs(wallet_user)]
         return jukeboxs
 
-    except:
-        raise HTTPException(status_code=HTTPStatus.NO_CONTENT, detail="No Jukeboxes")
+    except Exception as exc:
+        raise HTTPException(
+            status_code=HTTPStatus.NO_CONTENT, detail="No Jukeboxes"
+        ) from exc
 
 
 ##################SPOTIFY AUTH#####################
 
 
-@jukebox_ext.get("/api/v1/jukebox/spotify/cb/{juke_id}", response_class=HTMLResponse)
+@jukebox_api_router.get(
+    "/api/v1/jukebox/spotify/cb/{juke_id}", response_class=HTMLResponse
+)
 async def api_check_credentials_callbac(
     juke_id: str,
     code: str = Query(None),
@@ -63,13 +69,15 @@ async def api_check_credentials_callbac(
     return "<h1>Success!</h1><h2>You can close this window</h2>"
 
 
-@jukebox_ext.get("/api/v1/jukebox/{juke_id}", dependencies=[Depends(require_admin_key)])
+@jukebox_api_router.get(
+    "/api/v1/jukebox/{juke_id}", dependencies=[Depends(require_admin_key)]
+)
 async def api_check_credentials_check(juke_id: str):
     jukebox = await get_jukebox(juke_id)
     return jukebox
 
 
-@jukebox_ext.post(
+@jukebox_api_router.post(
     "/api/v1/jukebox",
     status_code=HTTPStatus.CREATED,
     dependencies=[Depends(require_admin_key)],
@@ -78,12 +86,14 @@ async def api_create_jukebox(data: CreateJukeLinkData) -> Jukebox:
     return await create_jukebox(data)
 
 
-@jukebox_ext.put("/api/v1/jukebox/{juke_id}", dependencies=[Depends(require_admin_key)])
+@jukebox_api_router.put(
+    "/api/v1/jukebox/{juke_id}", dependencies=[Depends(require_admin_key)]
+)
 async def api_update_jukebox(data: CreateJukeLinkData, juke_id: str) -> Jukebox:
     return await update_jukebox(data, juke_id=juke_id)
 
 
-@jukebox_ext.delete(
+@jukebox_api_router.delete(
     "/api/v1/jukebox/{juke_id}", dependencies=[Depends(require_admin_key)]
 )
 async def api_delete_item(juke_id: str):
@@ -93,7 +103,7 @@ async def api_delete_item(juke_id: str):
 ################JUKEBOX ENDPOINTS##################
 
 
-@jukebox_ext.get("/api/v1/jukebox/jb/playlist/{juke_id}/{sp_playlist}")
+@jukebox_api_router.get("/api/v1/jukebox/jb/playlist/{juke_id}/{sp_playlist}")
 async def api_get_jukebox_song(
     juke_id: str,
     sp_playlist: str,
@@ -107,7 +117,9 @@ async def api_get_jukebox_song(
     async with httpx.AsyncClient() as client:
         try:
             assert jukebox.sp_access_token
-            url = f"https://api.spotify.com/v1/playlists/{sp_playlist}/tracks"
+            url: Optional[str] = (
+                f"https://api.spotify.com/v1/playlists/{sp_playlist}/tracks"
+            )
             while url is not None:
                 r = await client.get(
                     url,
@@ -152,13 +164,13 @@ async def api_get_jukebox_song(
                     pass
 
                 # Check if there are more pages
-                url = response["next"] or None
+                url = response.get("next")
 
         except Exception as e:
             # Handle exceptions appropriately
             logger.error(f"Error: {e}")
 
-    return [track for track in tracks]
+    return list(tracks)
 
 
 ######GET ACCESS TOKEN######
@@ -185,7 +197,6 @@ async def api_get_token(juke_id):
                     + base64.b64encode(
                         str(jukebox.sp_user + ":" + jukebox.sp_secret).encode("ascii")
                     ).decode("ascii"),
-                    "Content-Type": "application/x-www-form-urlencoded",
                 },
             )
             if "access_token" not in r.json():
@@ -193,7 +204,7 @@ async def api_get_token(juke_id):
             else:
                 jukebox.sp_access_token = r.json()["access_token"]
                 await update_jukebox(jukebox, juke_id=juke_id)
-        except:
+        except Exception:
             pass
     return True
 
@@ -201,21 +212,21 @@ async def api_get_token(juke_id):
 ######CHECK DEVICE
 
 
-@jukebox_ext.get("/api/v1/jukebox/jb/{juke_id}")
+@jukebox_api_router.get("/api/v1/jukebox/jb/{juke_id}")
 async def api_get_jukebox_device_check(juke_id: str, retry: bool = Query(False)):
     jukebox = await get_jukebox(juke_id)
     if not jukebox:
         raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="No Jukeboxes")
     async with httpx.AsyncClient() as client:
         assert jukebox.sp_access_token
-        rDevice = await client.get(
+        r_device = await client.get(
             "https://api.spotify.com/v1/me/player/devices",
             timeout=40,
             headers={"Authorization": "Bearer " + jukebox.sp_access_token},
         )
-        if rDevice.status_code in (204, 200):
-            return json.loads(rDevice.text)
-        elif rDevice.status_code in (401, 403):
+        if r_device.status_code in (204, 200):
+            return json.loads(r_device.text)
+        elif r_device.status_code in (401, 403):
             token = await api_get_token(juke_id)
             if token is False:
                 raise HTTPException(
@@ -236,7 +247,7 @@ async def api_get_jukebox_device_check(juke_id: str, retry: bool = Query(False))
 ######GET INVOICE STUFF
 
 
-@jukebox_ext.get("/api/v1/jukebox/jb/invoice/{juke_id}/{song_id}")
+@jukebox_api_router.get("/api/v1/jukebox/jb/invoice/{juke_id}/{song_id}")
 async def api_get_jukebox_invoice(juke_id, song_id):
     jukebox = await get_jukebox(juke_id)
     if not jukebox:
@@ -244,18 +255,18 @@ async def api_get_jukebox_invoice(juke_id, song_id):
     try:
         assert jukebox.sp_device
         devices = await api_get_jukebox_device_check(juke_id)
-        deviceConnected = False
+        device_connected = False
         for device in devices["devices"]:
             if device["id"] == jukebox.sp_device.split("-")[1]:
-                deviceConnected = True
-        if not deviceConnected:
+                device_connected = True
+        if not device_connected:
             raise HTTPException(
                 status_code=HTTPStatus.NOT_FOUND, detail="No device connected"
             )
-    except:
+    except Exception as exc:
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="No device connected"
-        )
+        ) from exc
 
     invoice = await create_invoice(
         wallet_id=jukebox.wallet,
@@ -272,24 +283,24 @@ async def api_get_jukebox_invoice(juke_id, song_id):
     return jukebox_payment
 
 
-@jukebox_ext.get("/api/v1/jukebox/jb/checkinvoice/{pay_hash}/{juke_id}")
+@jukebox_api_router.get("/api/v1/jukebox/jb/checkinvoice/{pay_hash}/{juke_id}")
 async def api_get_jukebox_invoice_check(pay_hash: str, juke_id: str):
     try:
         await get_jukebox(juke_id)
-    except:
-        raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="No jukebox")
-    try:
-        status = await api_payment(pay_hash)
-        if status["paid"]:
-            await update_jukebox_payment(pay_hash, paid=True)
-            return {"paid": True}
-    except:
-        return {"paid": False}
+    except Exception as exc:
+        raise HTTPException(
+            status_code=HTTPStatus.FORBIDDEN, detail="No jukebox"
+        ) from exc
+    payment = await get_standalone_payment(pay_hash)
+    if not payment:
+        raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="No payment found")
+    status = await payment.check_status()
+    if status.paid:
+        await update_jukebox_payment(pay_hash, paid=True)
+    return {"paid": status.paid}
 
-    return {"paid": False}
 
-
-@jukebox_ext.get("/api/v1/jukebox/jb/invoicep/{song_id}/{juke_id}/{pay_hash}")
+@jukebox_api_router.get("/api/v1/jukebox/jb/invoicep/{song_id}/{juke_id}/{pay_hash}")
 async def api_get_jukebox_invoice_paid(
     song_id: str,
     juke_id: str,
@@ -309,16 +320,16 @@ async def api_get_jukebox_invoice_paid(
                 timeout=40,
                 headers={"Authorization": "Bearer " + jukebox.sp_access_token},
             )
-            rDevice = await client.get(
+            r_device = await client.get(
                 "https://api.spotify.com/v1/me/player",
                 timeout=40,
                 headers={"Authorization": "Bearer " + jukebox.sp_access_token},
             )
-            isPlaying = False
-            if rDevice.status_code == 200:
-                isPlaying = rDevice.json()["is_playing"]
+            is_playing = False
+            if r_device.status_code == 200:
+                is_playing = r_device.json()["is_playing"]
 
-            if r.status_code == 204 or isPlaying is False:
+            if r.status_code == 204 or is_playing is False:
                 async with httpx.AsyncClient() as client:
                     uri = ["spotify:track:" + song_id]
                     assert jukebox.sp_device
@@ -406,7 +417,7 @@ async def api_get_jukebox_invoice_paid(
 ############################GET QUEUE
 
 
-@jukebox_ext.get("/api/v1/jukebox/jb/queue/{juke_id}")
+@jukebox_api_router.get("/api/v1/jukebox/jb/queue/{juke_id}")
 async def api_get_jukebox_queue(
     juke_id: str,
 ):
@@ -448,10 +459,10 @@ async def api_get_jukebox_queue(
                             }
                         )
                     return {"playing": track, "queue": tracks}
-                except:
+                except Exception as exc:
                     raise HTTPException(
                         status_code=HTTPStatus.NOT_FOUND, detail="Something went wrong"
-                    )
+                    ) from exc
 
             elif r.status_code == 401:
                 token = await api_get_token(juke_id)
@@ -463,8 +474,8 @@ async def api_get_jukebox_queue(
                 raise HTTPException(
                     status_code=HTTPStatus.NOT_FOUND, detail="Something went wrong"
                 )
-        except:
+        except Exception as exc:
             raise HTTPException(
                 status_code=HTTPStatus.NOT_FOUND,
                 detail="Something went wrong, or no song is playing yet",
-            )
+            ) from exc
