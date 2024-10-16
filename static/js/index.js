@@ -1,17 +1,12 @@
-/* globals Quasar, Vue, _, VueQrcode, windowMixin, LNbits, LOCALE */
-
-Vue.component(VueQrcode.name, VueQrcode)
-
-var mapJukebox = obj => {
+const mapJukebox = obj => {
   if (obj.sp_device) {
     obj._data = _.clone(obj)
 
     obj.sp_id = obj._data.id
     obj.device = obj._data.sp_device.split('-')[0]
     playlists = obj._data.sp_playlists.split(',')
-    var i
     playlistsar = []
-    for (i = 0; i < playlists.length; i++) {
+    for (let i = 0; i < playlists.length; i++) {
       playlistsar.push(playlists[i].split('-')[0])
     }
     obj.playlist = playlistsar.join()
@@ -21,7 +16,7 @@ var mapJukebox = obj => {
   }
 }
 
-new Vue({
+window.app = Vue.createApp({
   el: '#vue',
   mixins: [windowMixin],
   data() {
@@ -384,8 +379,7 @@ new Vue({
     }
   },
   created() {
-    var getJukeboxes = this.getJukeboxes
-    getJukeboxes()
+    this.getJukeboxes()
     this.selectedWallet = this.g.user.wallets[0]
     this.locationcbPath = String(
       [

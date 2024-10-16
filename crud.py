@@ -1,7 +1,7 @@
 from typing import Optional
 
 from lnbits.db import Database
-from lnbits.helpers import insert_query, update_query, urlsafe_short_hash
+from lnbits.helpers import urlsafe_short_hash
 
 from .models import CreateJukeboxPayment, CreateJukeLinkData, Jukebox, JukeboxPayment
 
@@ -25,47 +25,42 @@ async def create_jukebox(inkey: str, data: CreateJukeLinkData) -> Jukebox:
         price=int(data.price),
         profit=0,
     )
-    await db.execute(
-        insert_query("jukebox.jukebox", jukebox),
-        jukebox.dict(),
-    )
+    await db.insert("jukebox.jukebox", jukebox)
     return jukebox
 
 
-async def update_jukebox(data: Jukebox) -> Jukebox:
-    jukebox = await db.execute(
-        update_query("jukebox.jukebox", data),
-        data.dict(),
-    )
+async def update_jukebox(jukebox: Jukebox) -> Jukebox:
+    await db.update("jukebox.jukebox", jukebox)
     return jukebox
 
 
 async def get_jukebox(juke_id: str) -> Optional[Jukebox]:
-    row = await db.fetchone(
-        "SELECT * FROM jukebox.jukebox WHERE id = :id", {"id": juke_id}
+    return await db.fetchone(
+        "SELECT * FROM jukebox.jukebox WHERE id = :id", {"id": juke_id}, Jukebox
     )
-    return Jukebox(**row) if row else None
 
 
 async def get_jukebox_by_user(user: str) -> Optional[Jukebox]:
-    row = await db.fetchone(
-        "SELECT * FROM jukebox.jukebox WHERE sp_user = :user", {"user": user}
+    return await db.fetchone(
+        "SELECT * FROM jukebox.jukebox WHERE sp_user = :user",
+        {"user": user},
+        Jukebox,
     )
-    return Jukebox(**row) if row else None
 
 
 async def get_jukeboxs(user: str) -> list[Jukebox]:
-    rows = await db.fetchall(
-        'SELECT * FROM jukebox.jukebox WHERE "user" = :user', {"user": user}
+    jukeboxes = await db.fetchall(
+        'SELECT * FROM jukebox.jukebox WHERE "user" = :user',
+        {"user": user},
+        Jukebox,
     )
-    for row in rows:
-        if row["sp_playlists"] is None:
-            await delete_jukebox(row["id"])
-    rows = await db.fetchall(
-        'SELECT * FROM jukebox.jukebox WHERE "user" = :user', {"user": user}
-    )
-
-    return [Jukebox(**row) for row in rows]
+    _jukeboxes = []
+    for jukebox in jukeboxes:
+        if jukebox.sp_playlists is None:
+            await delete_jukebox(jukebox.id)
+        else:
+            _jukeboxes.append(jukebox)
+    return _jukeboxes
 
 
 async def delete_jukebox(juke_id: str):
@@ -82,10 +77,7 @@ async def create_jukebox_payment(data: CreateJukeboxPayment) -> JukeboxPayment:
         song_id=data.song_id,
         paid=False,
     )
-    await db.execute(
-        insert_query("jukebox.jukebox_payment", jukebox_payment),
-        jukebox_payment.dict(),
-    )
+    await db.insert("jukebox.jukebox_payment", jukebox_payment)
     return jukebox_payment
 
 
@@ -100,8 +92,8 @@ async def update_jukebox_payment_paid(payment_hash: str) -> None:
 
 
 async def get_jukebox_payment(payment_hash: str) -> Optional[JukeboxPayment]:
-    row = await db.fetchone(
+    return await db.fetchone(
         "SELECT * FROM jukebox.jukebox_payment WHERE payment_hash = :payment_hash",
         {"payment_hash": payment_hash},
+        JukeboxPayment,
     )
-    return JukeboxPayment(**row) if row else None
