@@ -1,4 +1,4 @@
-from typing import List, Optional, Union
+from typing import Optional
 
 from lnbits.db import Database
 from lnbits.helpers import urlsafe_short_hash
@@ -8,107 +8,92 @@ from .models import CreateJukeboxPayment, CreateJukeLinkData, Jukebox, JukeboxPa
 db = Database("ext_jukebox")
 
 
-async def create_jukebox(data: CreateJukeLinkData) -> Jukebox:
+async def create_jukebox(inkey: str, data: CreateJukeLinkData) -> Jukebox:
     juke_id = urlsafe_short_hash()
-    await db.execute(
-        """
-        INSERT INTO jukebox.jukebox (
-            id, "user", title, wallet, sp_user, sp_secret, sp_access_token,
-            sp_refresh_token, sp_device, sp_playlists, price, profit
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            juke_id,
-            data.user,
-            data.title,
-            data.wallet,
-            data.sp_user,
-            data.sp_secret,
-            data.sp_access_token,
-            data.sp_refresh_token,
-            data.sp_device,
-            data.sp_playlists,
-            data.price,
-            0,
-        ),
+    jukebox = Jukebox(
+        id=juke_id,
+        inkey=inkey,
+        user=data.user,
+        title=data.title,
+        wallet=data.wallet,
+        sp_user=data.sp_user,
+        sp_secret=data.sp_secret,
+        sp_access_token=data.sp_access_token,
+        sp_refresh_token=data.sp_refresh_token,
+        sp_device=data.sp_device,
+        sp_playlists=data.sp_playlists,
+        price=int(data.price),
+        profit=0,
     )
-    jukebox = await get_jukebox(juke_id)
-    assert jukebox, "Newly created Jukebox couldn't be retrieved"
+    await db.insert("jukebox.jukebox", jukebox)
     return jukebox
 
 
-async def update_jukebox(
-    data: Union[CreateJukeLinkData, Jukebox], juke_id: str = ""
-) -> Jukebox:
-    q = ", ".join([f"{field[0]} = ?" for field in data])
-    items = [f"{field[1]}" for field in data]
-    items.append(juke_id)
-    q = q.replace("user", '"user"', 1)  # hack to make user be "user"!
-    await db.execute(f"UPDATE jukebox.jukebox SET {q} WHERE id = ?", (items,))
-    row = await db.fetchone("SELECT * FROM jukebox.jukebox WHERE id = ?", (juke_id,))
-    assert row, "Jukebox couldn't be retrieved after update"
-    return Jukebox(**row)
+async def update_jukebox(jukebox: Jukebox) -> Jukebox:
+    await db.update("jukebox.jukebox", jukebox)
+    return jukebox
 
 
 async def get_jukebox(juke_id: str) -> Optional[Jukebox]:
-    row = await db.fetchone("SELECT * FROM jukebox.jukebox WHERE id = ?", (juke_id,))
-    return Jukebox(**row) if row else None
+    return await db.fetchone(
+        "SELECT * FROM jukebox.jukebox WHERE id = :id", {"id": juke_id}, Jukebox
+    )
 
 
 async def get_jukebox_by_user(user: str) -> Optional[Jukebox]:
-    row = await db.fetchone("SELECT * FROM jukebox.jukebox WHERE sp_user = ?", (user,))
-    return Jukebox(**row) if row else None
+    return await db.fetchone(
+        "SELECT * FROM jukebox.jukebox WHERE sp_user = :user",
+        {"user": user},
+        Jukebox,
+    )
 
 
-async def get_jukeboxs(user: str) -> List[Jukebox]:
-    rows = await db.fetchall('SELECT * FROM jukebox.jukebox WHERE "user" = ?', (user,))
-    for row in rows:
-        if row.sp_playlists is None:
-            await delete_jukebox(row.id)
-    rows = await db.fetchall('SELECT * FROM jukebox.jukebox WHERE "user" = ?', (user,))
-
-    return [Jukebox(**row) for row in rows]
+async def get_jukeboxs(user: str) -> list[Jukebox]:
+    jukeboxes = await db.fetchall(
+        'SELECT * FROM jukebox.jukebox WHERE "user" = :user',
+        {"user": user},
+        Jukebox,
+    )
+    _jukeboxes = []
+    for jukebox in jukeboxes:
+        if jukebox.sp_playlists is None:
+            await delete_jukebox(jukebox.id)
+        else:
+            _jukeboxes.append(jukebox)
+    return _jukeboxes
 
 
 async def delete_jukebox(juke_id: str):
     await db.execute(
-        """
-        DELETE FROM jukebox.jukebox WHERE id = ?
-        """,
-        (juke_id,),
+        "DELETE FROM jukebox.jukebox WHERE id = :id",
+        {"id": juke_id},
     )
 
 
-#####################################PAYMENTS
+async def create_jukebox_payment(data: CreateJukeboxPayment) -> JukeboxPayment:
+    jukebox_payment = JukeboxPayment(
+        payment_hash=data.payment_hash,
+        juke_id=data.juke_id,
+        song_id=data.song_id,
+        paid=False,
+    )
+    await db.insert("jukebox.jukebox_payment", jukebox_payment)
+    return jukebox_payment
 
 
-async def create_jukebox_payment(data: CreateJukeboxPayment) -> CreateJukeboxPayment:
+async def update_jukebox_payment_paid(payment_hash: str) -> None:
     await db.execute(
         """
-        INSERT INTO jukebox.jukebox_payment (payment_hash, juke_id, song_id, paid)
-        VALUES (?, ?, ?, ?)
+        UPDATE jukebox.jukebox_payment
+        SET paid = True WHERE payment_hash = :payment_hash
         """,
-        (data.payment_hash, data.juke_id, data.song_id, False),
+        {"payment_hash": payment_hash},
     )
-    jukebox_payment = await get_jukebox_payment(data.payment_hash)
-    assert jukebox_payment, "Newly created Jukebox Payment couldn't be retrieved"
-    return data
-
-
-async def update_jukebox_payment(
-    payment_hash: str, **kwargs
-) -> Optional[JukeboxPayment]:
-    q = ", ".join([f"{field[0]} = ?" for field in kwargs.items()])
-    await db.execute(
-        f"UPDATE jukebox.jukebox_payment SET {q} WHERE payment_hash = ?",
-        (*kwargs.values(), payment_hash),
-    )
-    return await get_jukebox_payment(payment_hash)
 
 
 async def get_jukebox_payment(payment_hash: str) -> Optional[JukeboxPayment]:
-    row = await db.fetchone(
-        "SELECT * FROM jukebox.jukebox_payment WHERE payment_hash = ?", (payment_hash,)
+    return await db.fetchone(
+        "SELECT * FROM jukebox.jukebox_payment WHERE payment_hash = :payment_hash",
+        {"payment_hash": payment_hash},
+        JukeboxPayment,
     )
-    return JukeboxPayment(**row) if row else None

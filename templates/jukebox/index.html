@@ -17,10 +17,10 @@
         <q-table
           flat
           dense
-          :data="JukeboxLinks"
+          :rows="JukeboxLinks"
           row-key="id"
           :columns="JukeboxTable.columns"
-          :pagination.sync="JukeboxTable.pagination"
+          v-model:pagination="JukeboxTable.pagination"
           :filter="filter"
         >
           <template v-slot:header="props">

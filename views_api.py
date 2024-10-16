@@ -21,7 +21,7 @@ from .crud import (
     get_jukebox_payment,
     get_jukeboxs,
     update_jukebox,
-    update_jukebox_payment,
+    update_jukebox_payment_paid,
 )
 from .models import CreateJukeboxPayment, CreateJukeLinkData, Jukebox
 
@@ -61,11 +61,11 @@ async def api_check_credentials_callbac(
         raise HTTPException(detail="No Jukebox", status_code=HTTPStatus.FORBIDDEN)
     if code:
         jukebox.sp_access_token = code
-        await update_jukebox(jukebox, juke_id=juke_id)
+        await update_jukebox(jukebox)
     if access_token:
         jukebox.sp_access_token = access_token
         jukebox.sp_refresh_token = refresh_token
-        await update_jukebox(jukebox, juke_id=juke_id)
+        await update_jukebox(jukebox)
     return "<h1>Success!</h1><h2>You can close this window</h2>"
 
 
@@ -80,17 +80,25 @@ async def api_check_credentials_check(juke_id: str):
 @jukebox_api_router.post(
     "/api/v1/jukebox",
     status_code=HTTPStatus.CREATED,
-    dependencies=[Depends(require_admin_key)],
 )
-async def api_create_jukebox(data: CreateJukeLinkData) -> Jukebox:
-    return await create_jukebox(data)
+async def api_create_jukebox(
+    data: CreateJukeLinkData,
+    key_info: WalletTypeInfo = Depends(require_admin_key),
+) -> Jukebox:
+    return await create_jukebox(key_info.wallet.inkey, data)
 
 
 @jukebox_api_router.put(
     "/api/v1/jukebox/{juke_id}", dependencies=[Depends(require_admin_key)]
 )
 async def api_update_jukebox(data: CreateJukeLinkData, juke_id: str) -> Jukebox:
-    return await update_jukebox(data, juke_id=juke_id)
+    jukebox = await get_jukebox(juke_id)
+    if not jukebox:
+        raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="No Jukeboxes")
+    for k, v in data.dict().items():
+        if v is not None:
+            setattr(jukebox, k, v)
+    return await update_jukebox(jukebox)
 
 
 @jukebox_api_router.delete(
@@ -203,7 +211,7 @@ async def api_get_token(juke_id):
                 return False
             else:
                 jukebox.sp_access_token = r.json()["access_token"]
-                await update_jukebox(jukebox, juke_id=juke_id)
+                await update_jukebox(jukebox)
         except Exception:
             pass
     return True
@@ -296,7 +304,7 @@ async def api_get_jukebox_invoice_check(pay_hash: str, juke_id: str):
         raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="No payment found")
     status = await payment.check_status()
     if status.paid:
-        await update_jukebox_payment(pay_hash, paid=True)
+        await update_jukebox_payment_paid(pay_hash)
     return {"paid": status.paid}
 
 
