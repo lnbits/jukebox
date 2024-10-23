@@ -4,14 +4,13 @@ from http import HTTPStatus
 from typing import Optional
 
 import httpx
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import HTMLResponse
 from lnbits.core.crud import get_standalone_payment
 from lnbits.core.models import WalletTypeInfo
 from lnbits.core.services import create_invoice
 from lnbits.decorators import require_admin_key
 from loguru import logger
-from starlette.exceptions import HTTPException
-from starlette.responses import HTMLResponse
 
 from .crud import (
     create_jukebox,
@@ -31,17 +30,9 @@ jukebox_api_router = APIRouter()
 @jukebox_api_router.get("/api/v1/jukebox")
 async def api_get_jukeboxs(
     wallet: WalletTypeInfo = Depends(require_admin_key),
-):
+) -> list[Jukebox]:
     wallet_user = wallet.wallet.user
-
-    try:
-        jukeboxs = [jukebox.dict() for jukebox in await get_jukeboxs(wallet_user)]
-        return jukeboxs
-
-    except Exception as exc:
-        raise HTTPException(
-            status_code=HTTPStatus.NO_CONTENT, detail="No Jukeboxes"
-        ) from exc
+    return await get_jukeboxs(wallet_user)
 
 
 ##################SPOTIFY AUTH#####################
@@ -276,16 +267,18 @@ async def api_get_jukebox_invoice(juke_id, song_id):
             status_code=HTTPStatus.NOT_FOUND, detail="No device connected"
         ) from exc
 
-    invoice = await create_invoice(
+    payment = await create_invoice(
         wallet_id=jukebox.wallet,
         amount=jukebox.price,
         memo=jukebox.title,
         extra={"tag": "jukebox"},
     )
 
-    payment_hash = invoice[0]
     data = CreateJukeboxPayment(
-        invoice=invoice[1], payment_hash=payment_hash, juke_id=juke_id, song_id=song_id
+        invoice=payment.bolt11,
+        payment_hash=payment.payment_hash,
+        juke_id=juke_id,
+        song_id=song_id,
     )
     jukebox_payment = await create_jukebox_payment(data)
     return jukebox_payment
