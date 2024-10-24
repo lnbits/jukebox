@@ -14,7 +14,7 @@ class CreateJukeLinkData(BaseModel):
     sp_refresh_token: str = Query(None)
     sp_device: str = Query(None)
     sp_playlists: str = Query(None)
-    price: str = Query(None)
+    price: int = Query(None)
 
 
 class Jukebox(BaseModel):

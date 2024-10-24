@@ -4,14 +4,13 @@ from http import HTTPStatus
 from typing import Optional
 
 import httpx
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import HTMLResponse
 from lnbits.core.crud import get_standalone_payment
 from lnbits.core.models import WalletTypeInfo
 from lnbits.core.services import create_invoice
 from lnbits.decorators import require_admin_key
 from loguru import logger
-from starlette.exceptions import HTTPException
-from starlette.responses import HTMLResponse
 
 from .crud import (
     create_jukebox,
@@ -21,7 +20,7 @@ from .crud import (
     get_jukebox_payment,
     get_jukeboxs,
     update_jukebox,
-    update_jukebox_payment,
+    update_jukebox_payment_paid,
 )
 from .models import CreateJukeboxPayment, CreateJukeLinkData, Jukebox
 
@@ -31,17 +30,9 @@ jukebox_api_router = APIRouter()
 @jukebox_api_router.get("/api/v1/jukebox")
 async def api_get_jukeboxs(
     wallet: WalletTypeInfo = Depends(require_admin_key),
-):
+) -> list[Jukebox]:
     wallet_user = wallet.wallet.user
-
-    try:
-        jukeboxs = [jukebox.dict() for jukebox in await get_jukeboxs(wallet_user)]
-        return jukeboxs
-
-    except Exception as exc:
-        raise HTTPException(
-            status_code=HTTPStatus.NO_CONTENT, detail="No Jukeboxes"
-        ) from exc
+    return await get_jukeboxs(wallet_user)
 
 
 ##################SPOTIFY AUTH#####################
@@ -61,11 +52,11 @@ async def api_check_credentials_callbac(
         raise HTTPException(detail="No Jukebox", status_code=HTTPStatus.FORBIDDEN)
     if code:
         jukebox.sp_access_token = code
-        await update_jukebox(jukebox, juke_id=juke_id)
+        await update_jukebox(jukebox)
     if access_token:
         jukebox.sp_access_token = access_token
         jukebox.sp_refresh_token = refresh_token
-        await update_jukebox(jukebox, juke_id=juke_id)
+        await update_jukebox(jukebox)
     return "<h1>Success!</h1><h2>You can close this window</h2>"
 
 
@@ -80,17 +71,25 @@ async def api_check_credentials_check(juke_id: str):
 @jukebox_api_router.post(
     "/api/v1/jukebox",
     status_code=HTTPStatus.CREATED,
-    dependencies=[Depends(require_admin_key)],
 )
-async def api_create_jukebox(data: CreateJukeLinkData) -> Jukebox:
-    return await create_jukebox(data)
+async def api_create_jukebox(
+    data: CreateJukeLinkData,
+    key_info: WalletTypeInfo = Depends(require_admin_key),
+) -> Jukebox:
+    return await create_jukebox(key_info.wallet.inkey, data)
 
 
 @jukebox_api_router.put(
     "/api/v1/jukebox/{juke_id}", dependencies=[Depends(require_admin_key)]
 )
 async def api_update_jukebox(data: CreateJukeLinkData, juke_id: str) -> Jukebox:
-    return await update_jukebox(data, juke_id=juke_id)
+    jukebox = await get_jukebox(juke_id)
+    if not jukebox:
+        raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="No Jukeboxes")
+    for k, v in data.dict().items():
+        if v is not None:
+            setattr(jukebox, k, v)
+    return await update_jukebox(jukebox)
 
 
 @jukebox_api_router.delete(
@@ -203,7 +202,7 @@ async def api_get_token(juke_id):
                 return False
             else:
                 jukebox.sp_access_token = r.json()["access_token"]
-                await update_jukebox(jukebox, juke_id=juke_id)
+                await update_jukebox(jukebox)
         except Exception:
             pass
     return True
@@ -268,19 +267,21 @@ async def api_get_jukebox_invoice(juke_id, song_id):
             status_code=HTTPStatus.NOT_FOUND, detail="No device connected"
         ) from exc
 
-    invoice = await create_invoice(
+    payment = await create_invoice(
         wallet_id=jukebox.wallet,
         amount=jukebox.price,
         memo=jukebox.title,
         extra={"tag": "jukebox"},
     )
 
-    payment_hash = invoice[0]
     data = CreateJukeboxPayment(
-        invoice=invoice[1], payment_hash=payment_hash, juke_id=juke_id, song_id=song_id
+        invoice=payment.bolt11,
+        payment_hash=payment.payment_hash,
+        juke_id=juke_id,
+        song_id=song_id,
     )
     jukebox_payment = await create_jukebox_payment(data)
-    return jukebox_payment
+    return {**jukebox_payment.dict(), "invoice": payment.bolt11}
 
 
 @jukebox_api_router.get("/api/v1/jukebox/jb/checkinvoice/{pay_hash}/{juke_id}")
@@ -296,7 +297,7 @@ async def api_get_jukebox_invoice_check(pay_hash: str, juke_id: str):
         raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="No payment found")
     status = await payment.check_status()
     if status.paid:
-        await update_jukebox_payment(pay_hash, paid=True)
+        await update_jukebox_payment_paid(pay_hash)
     return {"paid": status.paid}
 
 
