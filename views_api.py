@@ -6,12 +6,11 @@ from typing import Optional
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse
-from loguru import logger
-
 from lnbits.core.crud import get_standalone_payment
 from lnbits.core.models import WalletTypeInfo
 from lnbits.core.services import create_invoice
 from lnbits.decorators import require_admin_key
+from loguru import logger
 
 from .crud import (
     create_jukebox,

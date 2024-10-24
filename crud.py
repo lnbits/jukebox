@@ -72,7 +72,6 @@ async def delete_jukebox(juke_id: str):
 
 async def create_jukebox_payment(data: CreateJukeboxPayment) -> JukeboxPayment:
     jukebox_payment = JukeboxPayment(
-        invoice=data.invoice,
         payment_hash=data.payment_hash,
         juke_id=data.juke_id,
         song_id=data.song_id,
