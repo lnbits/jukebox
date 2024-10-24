@@ -6,11 +6,12 @@ from typing import Optional
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse
+from loguru import logger
+
 from lnbits.core.crud import get_standalone_payment
 from lnbits.core.models import WalletTypeInfo
 from lnbits.core.services import create_invoice
 from lnbits.decorators import require_admin_key
-from loguru import logger
 
 from .crud import (
     create_jukebox,
@@ -281,7 +282,7 @@ async def api_get_jukebox_invoice(juke_id, song_id):
         song_id=song_id,
     )
     jukebox_payment = await create_jukebox_payment(data)
-    return jukebox_payment
+    return {**jukebox_payment.dict(), "invoice": payment.bolt11}
 
 
 @jukebox_api_router.get("/api/v1/jukebox/jb/checkinvoice/{pay_hash}/{juke_id}")
