@@ -292,7 +292,7 @@ async def api_get_jukebox_invoice_check(pay_hash: str, juke_id: str):
         raise HTTPException(
             status_code=HTTPStatus.FORBIDDEN, detail="No jukebox"
         ) from exc
-    payment = await get_standalone_payment(pay_hash)
+    payment = await get_standalone_payment(pay_hash, incoming=True)
     if not payment:
         raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="No payment found")
     status = await payment.check_status()
