@@ -20,12 +20,12 @@
       </q-card-section>
     </q-card>
   </div>
-  {% endblock %} {% block scripts %}
-  <script>
-    window.app = Vue.createApp({
-      el: '#vue',
-      mixins: [windowMixin]
-    })
-  </script>
-  {% endblock %}
 </div>
+{% endblock %} {% block scripts %}
+<script>
+  window.app = Vue.createApp({
+    el: '#vue',
+    mixins: [windowMixin]
+  })
+</script>
+{% endblock %}

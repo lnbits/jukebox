@@ -246,50 +246,47 @@
             this.receive.paymentHash = response.data.payment_hash
             this.receive.dialogues.second = true
             dialog.data = response.data
-
             dialog.dismissMsg = this.$q.notify({
               timeout: 0,
               message: 'Waiting for payment...'
             })
-            dialog.paymentChecker = setInterval(() => {
-              LNbits.api
-                .request(
-                  'GET',
-                  '/jukebox/api/v1/jukebox/jb/checkinvoice/' +
-                    this.receive.paymentHash +
-                    '/{{ juke_id }}'
-                )
-                .then(res => {
-                  if (res.data.paid == true) {
-                    clearInterval(dialog.paymentChecker)
-                    LNbits.api
-                      .request(
-                        'GET',
-                        '/jukebox/api/v1/jukebox/jb/invoicep/' +
-                          this.receive.id +
-                          '/{{ juke_id }}/' +
-                          this.receive.paymentHash
-                      )
-                      .then(ress => {
-                        if (ress.data.song_id == this.receive.id) {
-                          clearInterval(dialog.paymentChecker)
-                          dialog.dismissMsg()
-                          this.receive.dialogues.second = false
-                          this.receive.dialogues.first = false
-                          this.$q.notify({
-                            type: 'positive',
-                            message:
-                              'Success! "' +
-                              this.receive.name +
-                              '" will be played soon',
-                            timeout: 3000
-                          })
-                          this.getQueue()
-                        }
-                      })
-                  }
+            if (location.protocol !== 'http:') {
+              this.websocketUrl =
+                'wss://' + document.domain + ':' + location.port + '/api/v1/ws'
+            } else {
+              this.websocketUrl =
+                'ws://' + document.domain + ':' + location.port + '/api/v1/ws'
+            }
+            this.connectionWebsocket = new WebSocket(
+              this.websocketUrl + '/' + response.data.payment_hash
+            )
+            this.connectionWebsocket.onmessage = e => {
+              if (e.data == 'paid') {
+                dialog.dismissMsg()
+                this.receive.dialogues.second = false
+                this.receive.dialogues.first = false
+                this.$q.notify({
+                  type: 'positive',
+                  message:
+                    'Success! "' + this.receive.name + '" will be played soon',
+                  timeout: 3000
                 })
-            }, 3000)
+                LNbits.api
+                  .request(
+                    'GET',
+                    '/jukebox/api/v1/jukebox/jb/invoicep/' +
+                      this.receive.id +
+                      '/{{ juke_id }}/' +
+                      this.receive.paymentHash
+                  )
+                  .then(ress => {
+                    if (ress.data.song_id == this.receive.id) {
+                      this.getQueue()
+                    }
+                  })
+                this.connectionWebsocket.close()
+              }
+            }
           })
           .catch(err => {
             clearInterval(dialog.paymentChecker)

@@ -1,6 +1,7 @@
 import asyncio
 
 from lnbits.core.models import Payment
+from lnbits.core.services import websocket_updater
 from lnbits.tasks import register_invoice_listener
 
 from .crud import update_jukebox_payment_paid
@@ -21,3 +22,4 @@ async def on_invoice_paid(payment: Payment) -> None:
         return
 
     await update_jukebox_payment_paid(payment.payment_hash)
+    await websocket_updater(payment.payment_hash, "paid")
