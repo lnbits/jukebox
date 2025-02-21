@@ -137,7 +137,7 @@ async def api_get_jukebox_song(
                                 detail="Failed to get auth",
                             )
                         else:
-                            return await api_get_jukebox_song(
+                            return api_get_jukebox_song(
                                 juke_id, sp_playlist, retry=True
                             )
                     return r
@@ -256,7 +256,7 @@ async def api_get_jukebox_invoice(juke_id, song_id):
         devices = await api_get_jukebox_device_check(juke_id)
         device_connected = False
         for device in devices["devices"]:
-            if device["id"] == jukebox.sp_device.split("-")[1]:
+            if device["id"] == jukebox.sp_device.split("-")[-1]:
                 device_connected = True
         if not device_connected:
             raise HTTPException(
@@ -336,7 +336,7 @@ async def api_get_jukebox_invoice_paid(
                     assert jukebox.sp_device
                     r = await client.put(
                         "https://api.spotify.com/v1/me/player/play?device_id="
-                        + jukebox.sp_device.split("-")[1],
+                        + jukebox.sp_device.split("-")[-1],
                         json={"uris": uri},
                         timeout=40,
                         headers={"Authorization": "Bearer " + jukebox.sp_access_token},
@@ -371,7 +371,7 @@ async def api_get_jukebox_invoice_paid(
                         "https://api.spotify.com/v1/me/player/queue?uri=spotify%3Atrack%3A"
                         + song_id
                         + "&device_id="
-                        + jukebox.sp_device.split("-")[1],
+                        + jukebox.sp_device.split("-")[-1],
                         timeout=40,
                         headers={"Authorization": "Bearer " + jukebox.sp_access_token},
                     )

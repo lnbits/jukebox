@@ -36,7 +36,7 @@ async def connect_to_jukebox(request: Request, juke_id):
     assert jukebox.sp_device
     assert jukebox.sp_playlists
     for device in devices["devices"]:
-        if device["id"] == jukebox.sp_device.split("-")[1]:
+        if device["id"] == jukebox.sp_device.split("-")[-1]:
             device_connected = True
     if device_connected:
         return jukebox_renderer().TemplateResponse(
