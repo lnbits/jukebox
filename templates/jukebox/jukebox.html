@@ -135,7 +135,8 @@
       <br />
       <div class="row q-mt-lg q-gutter-sm">
         <q-btn outline color="grey" @click="getInvoice(receive.id)"
-          >Play for {% endraw %}{{ price }} sats
+          >Play for {% endraw %}
+          <span v-text="formatBalance(price)"></span>
         </q-btn>
       </div>
     </q-card>
