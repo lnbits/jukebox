@@ -37,4 +37,4 @@ def jukebox_start():
     scheduled_tasks.append(task)
 
 
-__all__ = ["jukebox_ext", "jukebox_static_files", "jukebox_start", "jukebox_stop", "db"]
+__all__ = ["db", "jukebox_ext", "jukebox_start", "jukebox_static_files", "jukebox_stop"]

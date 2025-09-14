@@ -32,7 +32,7 @@
             v-model="playlist"
             :options="playlists"
             label="playlists"
-            @input="selectPlaylist()"
+            @update:model-value="selectPlaylist"
           >
           </q-select>
         </q-card-section>
