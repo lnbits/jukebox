@@ -1,8 +1,12 @@
 {
+  "id": "jukebox",
+  "version": "1.0.4",
   "name": "Jukebox",
+  "repo": "https://github.com/lnbits/jukebox",
   "short_description": "Spotify jukebox middleware",
+  "description": "",
   "tile": "/jukebox/static/image/jukebox.png",
-  "min_lnbits_version": "1.0.0",
+  "min_lnbits_version": "1.3.0",
   "contributors": [
     {
       "name": "Ben Arc",
@@ -47,5 +51,9 @@
   ],
   "description_md": "https://raw.githubusercontent.com/lnbits/jukebox/main/description.md",
   "terms_and_conditions_md": "https://raw.githubusercontent.com/lnbits/jukebox/main/toc.md",
-  "license": "MIT"
+  "license": "MIT",
+  "paid_features": "",
+  "tags": ["Fun & Social", "Entertainment"],
+  "donate": "",
+  "hidden": false
 }
