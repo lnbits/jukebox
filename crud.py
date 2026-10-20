@@ -10,20 +10,8 @@ db = Database("ext_jukebox")
 
 async def create_jukebox(inkey: str, data: CreateJukeLinkData) -> Jukebox:
     juke_id = urlsafe_short_hash()
-    jukebox = Jukebox(
-        id=juke_id,
-        inkey=inkey,
-        user=data.user,
-        title=data.title,
-        wallet=data.wallet,
-        sp_user=data.sp_user,
-        sp_secret=data.sp_secret,
-        sp_access_token=data.sp_access_token,
-        sp_refresh_token=data.sp_refresh_token,
-        sp_device=data.sp_device,
-        sp_playlists=data.sp_playlists,
-        price=int(data.price),
-        profit=0,
+    jukebox = Jukebox.model_validate(
+        {**data.model_dump(), "id": juke_id, "inkey": inkey, "profit": 0}
     )
     await db.insert("jukebox.jukebox", jukebox)
     return jukebox
@@ -71,11 +59,8 @@ async def delete_jukebox(juke_id: str):
 
 
 async def create_jukebox_payment(data: CreateJukeboxPayment) -> JukeboxPayment:
-    jukebox_payment = JukeboxPayment(
-        payment_hash=data.payment_hash,
-        juke_id=data.juke_id,
-        song_id=data.song_id,
-        paid=False,
+    jukebox_payment = JukeboxPayment.model_validate(
+        {**data.model_dump(), "paid": False}
     )
     await db.insert("jukebox.jukebox_payment", jukebox_payment)
     return jukebox_payment

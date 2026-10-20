@@ -86,7 +86,7 @@ async def api_update_jukebox(data: CreateJukeLinkData, juke_id: str) -> Jukebox:
     jukebox = await get_jukebox(juke_id)
     if not jukebox:
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="No Jukeboxes")
-    for k, v in data.dict().items():
+    for k, v in data.model_dump().items():
         if v is not None:
             setattr(jukebox, k, v)
     return await update_jukebox(jukebox)
@@ -281,7 +281,7 @@ async def api_get_jukebox_invoice(juke_id, song_id):
         song_id=song_id,
     )
     jukebox_payment = await create_jukebox_payment(data)
-    return {**jukebox_payment.dict(), "invoice": payment.bolt11}
+    return {**jukebox_payment.model_dump(), "invoice": payment.bolt11}
 
 
 @jukebox_api_router.get("/api/v1/jukebox/jb/checkinvoice/{pay_hash}/{juke_id}")

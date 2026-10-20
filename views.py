@@ -20,7 +20,7 @@ def jukebox_renderer():
 @jukebox_generic_router.get("/", response_class=HTMLResponse)
 async def index(request: Request, user: User = Depends(check_user_exists)):
     return jukebox_renderer().TemplateResponse(
-        "jukebox/index.html", {"request": request, "user": user.json()}
+        "jukebox/index.html", {"request": request, "user": user.model_dump_json()}
     )
 
 
