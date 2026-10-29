@@ -1,5 +1,3 @@
-from typing import Optional
-
 from lnbits.db import Database
 from lnbits.helpers import urlsafe_short_hash
 
@@ -22,13 +20,13 @@ async def update_jukebox(jukebox: Jukebox) -> Jukebox:
     return jukebox
 
 
-async def get_jukebox(juke_id: str) -> Optional[Jukebox]:
+async def get_jukebox(juke_id: str) -> Jukebox | None:
     return await db.fetchone(
         "SELECT * FROM jukebox.jukebox WHERE id = :id", {"id": juke_id}, Jukebox
     )
 
 
-async def get_jukebox_by_user(user: str) -> Optional[Jukebox]:
+async def get_jukebox_by_user(user: str) -> Jukebox | None:
     return await db.fetchone(
         "SELECT * FROM jukebox.jukebox WHERE sp_user = :user",
         {"user": user},
@@ -76,7 +74,7 @@ async def update_jukebox_payment_paid(payment_hash: str) -> None:
     )
 
 
-async def get_jukebox_payment(payment_hash: str) -> Optional[JukeboxPayment]:
+async def get_jukebox_payment(payment_hash: str) -> JukeboxPayment | None:
     return await db.fetchone(
         "SELECT * FROM jukebox.jukebox_payment WHERE payment_hash = :payment_hash",
         {"payment_hash": payment_hash},

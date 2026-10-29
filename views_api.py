@@ -1,7 +1,6 @@
 import base64
 import json
 from http import HTTPStatus
-from typing import Optional
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -116,7 +115,7 @@ async def api_get_jukebox_song(
     async with httpx.AsyncClient() as client:
         try:
             assert jukebox.sp_access_token
-            url: Optional[str] = (
+            url: str | None = (
                 f"https://api.spotify.com/v1/playlists/{sp_playlist}/tracks"
             )
             while url is not None:

@@ -1,5 +1,3 @@
-from typing import Optional
-
 from fastapi import Query
 from pydantic import BaseModel
 
@@ -22,13 +20,13 @@ class Jukebox(BaseModel):
     user: str
     title: str
     wallet: str
-    inkey: Optional[str] = None
+    inkey: str | None = None
     sp_user: str
     sp_secret: str
-    sp_access_token: Optional[str] = None
-    sp_refresh_token: Optional[str] = None
-    sp_device: Optional[str] = None
-    sp_playlists: Optional[str] = None
+    sp_access_token: str | None = None
+    sp_refresh_token: str | None = None
+    sp_device: str | None = None
+    sp_playlists: str | None = None
     price: int
     profit: int
 
